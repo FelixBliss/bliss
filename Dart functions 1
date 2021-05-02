@@ -1,1 +1,14 @@
 
+arithmetic (num1,num2){
+  //addition
+  print(num1+num2);
+    //multiplication
+ print(num1*num2);
+  //subtraction
+  print(num1-num2);
+  //subtraction
+  print(num1-num2);
+}
+void main(){
+  arithmetic(6,3);
+  }

@@ -67,7 +67,7 @@ for(let v of cars){
    let gap=stopY-screenY;
    pace=Math.min(pace,Math.max(0,(gap-.025)*240));
  }
- v.v=pace;
+
  v.y+=dt*(.06+pace*.0015);
  if(v.y>1.17){
    v.y=-.12-Math.random()*.55;
@@ -75,7 +75,7 @@ for(let v of cars){
    v.l=choices.length?choices[Math.floor(Math.random()*choices.length)]:Math.floor(Math.random()*4);
    v.v=18+Math.random()*15;v.color=['#e9ecef','#d64b43','#d8ad36','#317da5','#586d7a'][Math.floor(Math.random()*5)];v.kind=Math.random()<.16?'van':Math.random()<.5?'taxi':'car'
  }}
-for(let b of bikes){let ahead=cars.find(v=>v.l===b.l&&v.y<b.y&&b.y-v.y<.12);let pace=b.v;if(ahead)pace=Math.min(pace,ahead.v,Math.max(0,(b.y-ahead.y-.07)*100));let sy=.19+b.y*.91;if(signalVisible&&light!=="green"&&sy<stopY&&stopY-sy<.13)pace=Math.min(pace,Math.max(0,(stopY-sy-.02)*220));b.v=pace;b.y+=dt*(.08+pace*.0015);if(b.y>1.16){b.y=-.25-Math.random()*.6;let lanes=[0,1].filter(l=>!bikes.some(o=>o!==b&&o.l===l&&Math.abs(o.y-b.y)<.2));b.l=lanes.length?lanes[Math.floor(Math.random()*lanes.length)]:(Math.random()<.5?0:1);b.v=27+Math.random()*12}}
+for(let b of bikes){let ahead=cars.find(v=>v.l===b.l&&v.y<b.y&&b.y-v.y<.12);let pace=b.v;if(ahead)pace=Math.min(pace,ahead.v,Math.max(0,(b.y-ahead.y-.07)*100));let sy=.19+b.y*.91;if(signalVisible&&light!=="green"&&sy<stopY&&stopY-sy<.13)pace=Math.min(pace,Math.max(0,(stopY-sy-.02)*220));b.y+=dt*(.08+pace*.0015);if(b.y>1.16){b.y=-.25-Math.random()*.6;let lanes=[0,1].filter(l=>!bikes.some(o=>o!==b&&o.l===l&&Math.abs(o.y-b.y)<.2));b.l=lanes.length?lanes[Math.floor(Math.random()*lanes.length)]:(Math.random()<.5?0:1);b.v=27+Math.random()*12}}
 let phase=roadScroll%1800;if(phase>1290&&phase<1390&&light==='red'&&speed>35&&hitCooldown<=0){coins=Math.max(0,coins-1);$('coins').textContent=coins;hitCooldown=1.6;say('Red-light violation: −1 coin')}
 let px=W*.5+steer*W*.23,py=H*.82;if(hitCooldown>0)hitCooldown-=dt;
 if(hitCooldown<=0){for(let v of cars){let y=H*(.19+v.y*.91),x=xLane(v.l,y);if(Math.abs(y-py)<H*.055&&Math.abs(x-px)<W*.065){coins=Math.max(0,coins-1);$('coins').textContent=coins;hitCooldown=1.5;speed*=.45;v.y=-.2;say('Car collision: −1 coin');break}}}

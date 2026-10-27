@@ -125,12 +125,15 @@ traffic.forEach(o=>{
  const crossedPlayer=(previousZ-player.position.z)*(o.position.z-player.position.z)<=0;
  // Separate both vehicles at contact; only the vehicle that caused the impact loses speed.
  if(lateralGap<1.55&&(longitudinalGap<2.65||crossedPlayer)){
-   const aiBehind=previousZ>player.position.z;
-   o.position.z=player.position.z+(aiBehind?2.65:-2.65);
+   // A same-direction AI vehicle behind the player is responsible for a rear impact.
+   // Slow that AI vehicle; never reduce the player's speed or throttle for this impact.
+   const rearImpact=!u.oncoming&&previousZ>player.position.z;
+   o.position.z=player.position.z+(rearImpact?2.65:-2.65);
    if(hitLock<=0){
-     if(aiBehind){
-       u.speed=Math.min(u.speed,Math.max(18,Math.abs(worldVelocity)*.62));
-       say('Rear impact! Traffic vehicle slowed');
+     if(rearImpact){
+       u.speed=Math.min(u.speed,Math.max(12,Math.abs(worldVelocity)*.5));
+       u.changeCooldown=Math.max(u.changeCooldown,1.2);
+       say('Rear impact! AI car slowed');
      }else{
        speed*=.42;
        collisionRecovery=.7;

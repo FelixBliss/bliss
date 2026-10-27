@@ -83,7 +83,7 @@ traffic.forEach(o=>{
  const u=o.userData,lanes=u.oncoming?opposingLanes:sameLanes;
  u.changeCooldown=Math.max(0,u.changeCooldown-dt);
  // Detect a slower vehicle ahead in the same lane; never consider vehicles across the median.
- const ahead=traffic.find(t=>t!==o&&t.userData.oncoming===u.oncoming&&Math.abs(t.position.x-o.position.x)<1.45&&
+ const ahead=traffic.find(t=>t!==o&&t.userData.oncoming===u.oncoming&&t.userData.speed<u.speed-1&&Math.abs(t.position.x-o.position.x)<1.45&&
    (u.oncoming?t.position.z>o.position.z+1.5:t.position.z<o.position.z-1.5)&&
    Math.abs(t.position.z-o.position.z)<15);
  if(ahead&&!u.overtaking&&u.changeCooldown<=0){

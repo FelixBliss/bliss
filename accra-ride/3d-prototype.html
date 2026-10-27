@@ -11,8 +11,10 @@
 <script>
 (()=> {
 const $=id=>document.getElementById(id);
-const MAX_KMH=120, PACE_MAX=70, PACE_EXP=1.0;
-const paceOf=kmh=>PACE_MAX*Math.pow(Math.min(1,Math.abs(kmh)/MAX_KMH),PACE_EXP);
+const PACE_MAX=70, PACE_EXP=1.0;
+const vehicleSpecs={economy:{name:'Economy Car',maxForwardKmh:180,maxReverseKmh:100}};
+const playerVehicle=vehicleSpecs.economy;
+const paceOf=kmh=>PACE_MAX*Math.pow(Math.min(1,Math.abs(kmh)/playerVehicle.maxForwardKmh),PACE_EXP);
 if(!window.THREE){$('mission').textContent='3D engine could not load — check internet connection';return;}
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x9acde6);scene.fog=new THREE.Fog(0x9acde6,65,240);
 const camera=new THREE.PerspectiveCamera(innerWidth>innerHeight?72:66,innerWidth/innerHeight,.1,320);camera.position.set(0,5.6,10.5);
@@ -56,12 +58,12 @@ wheelArea.addEventListener('pointermove',e=>{if(wheelTouch!==e.pointerId)return;
 function releaseWheel(e){if(wheelTouch!==e.pointerId)return;wheelTouch=null;wheelStartX=null;steerTarget=0;wheel.style.transform='rotate(0deg)'}wheelArea.addEventListener('pointerup',releaseWheel);wheelArea.addEventListener('pointercancel',releaseWheel);
 function update(dt){lightTime+=dt;if(lightTime>7){lightTime=0;lightPhase=(lightPhase+1)%3}bulbs.forEach((b,i)=>{b.material.emissive=new THREE.Color(i===lightPhase?[0xff0000,0xffbf00,0x00aa44][i]:0x000000);b.material.emissiveIntensity=i===lightPhase?1.2:0});
 steer+=(steerTarget-steer)*Math.min(1,dt*(Math.abs(speed)>35?7.5:8.5));
-const requestedThrottle=gas&&!brake?1:0;throttleResponse+=(requestedThrottle-throttleResponse)*Math.min(1,dt*(requestedThrottle?2.4:3.2));const throttle=throttleResponse;const maxSpeed=reverse?28:120;const accel=reverse?16:18+Math.min(12,Math.abs(speed)*.12);
+const requestedThrottle=gas&&!brake?1:0;throttleResponse+=(requestedThrottle-throttleResponse)*Math.min(1,dt*(requestedThrottle?2.4:3.2));const throttle=throttleResponse;const maxSpeed=reverse?playerVehicle.maxReverseKmh:playerVehicle.maxForwardKmh;const accel=reverse?16:18+Math.min(12,Math.abs(speed)*.12);
 if(throttle>0)speed+=(reverse?-1:1)*accel*throttle*dt;
 // Coasting resistance grows with speed; braking is stronger and overrides throttle.
 if(Math.abs(speed)>.1){const drag=.006*Math.abs(speed)+.00016*speed*speed;speed-=Math.sign(speed)*drag*dt}
 if(brake&&Math.abs(speed)>.05){const decel=reverse?30:34;speed-=Math.sign(speed)*decel*Math.max(.35,brakeLevel)*dt}
-speed=Math.max(reverse?-28:0,Math.min(maxSpeed,speed));
+speed=Math.max(reverse?-playerVehicle.maxReverseKmh:0,Math.min(reverse?0:playerVehicle.maxForwardKmh,speed));
 // Convert displayed km/h into world speed, then model steering as lateral acceleration with grip.
 const speedPace=paceOf(speed);const move=Math.sign(speed)*speedPace*dt;const worldVelocity=dt>0?move/dt:0;driveDistance+=Math.abs(move);world.position.z+=move;
 const steeringAuthority=.18*Math.max(5,Math.abs(speed));lateralVelocity+=(steer*steeringAuthority-lateralVelocity*1.9)*dt;

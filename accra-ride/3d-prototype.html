@@ -47,7 +47,7 @@ const steeringWheel=new THREE.Group();const steeringMaterial=mat(0x17191b,.35,.1
 const headlamps=[];for(const x of [-.43,.43]){const lamp=new THREE.SpotLight(0xfff1ce,0,68,Math.PI/7,.45,1.3);lamp.position.set(x,.57,-1.43);lamp.target.position.set(x,-.05,-28);player.add(lamp);player.add(lamp.target);headlamps.push(lamp);const lens=new THREE.Mesh(new THREE.BoxGeometry(.3,.15,.055),mat(0xfff4c8,.25));lens.position.set(x,.61,-1.43);player.add(lens);const glow=new THREE.PointLight(0xffe7a1,0,4);glow.position.set(x,.6,-1.5);player.add(glow);headlamps.push(glow)}
 const traffic=[];const colors=[0xd94b40,0x287cb6,0xe4e4dc,0x3b4a54,0xe3a34b,0x4b9a66];
 const sameLanes=[2.75,6.25],opposingLanes=[-6.25,-2.75];
-function addTraffic(z,lane,oncoming=false,bike=false,startsBehind=false){const o=car(bike?0x262d31:colors[Math.floor(Math.random()*colors.length)],bike);o.position.set(lane,0,z);const baseSpeed=oncoming?72+Math.random()*43:bike?82+Math.random()*48:62+Math.random()*66;o.userData={lane,targetLane:lane,homeLane:lane,oncoming,bike,baseZ:z,startsBehind,speed:baseSpeed,overtaking:false,passTarget:null,changeCooldown:.25+Math.random()*1.1};scene.add(o);traffic.push(o)}
+function addTraffic(z,lane,oncoming=false,bike=false,startsBehind=false){const o=car(bike?0x262d31:colors[Math.floor(Math.random()*colors.length)],bike);o.position.set(lane,0,z);const baseSpeed=oncoming?72+Math.random()*43:bike?82+Math.random()*48:62+Math.random()*66;o.userData={lane,targetLane:lane,homeLane:lane,oncoming,bike,baseZ:z,startsBehind,speed:baseSpeed,overtaking:false,passTarget:null,changeCooldown:.25+Math.random()*1.1,collisionCooldown:0};scene.add(o);traffic.push(o)}
 // Denser highway flow: varied speeds let some vehicles pull ahead while others are passed.
 for(let i=0;i<12;i++){addTraffic(-28-i*(25+Math.random()*7),sameLanes[Math.floor(Math.random()*sameLanes.length)],false,i===3||i===6||i===9);addTraffic(-34-i*(27+Math.random()*7),opposingLanes[Math.floor(Math.random()*opposingLanes.length)],true,i===5)}
 // A few faster same-direction vehicles begin behind the player and can catch up to overtake.
@@ -91,6 +91,7 @@ medianFlowers.forEach(p=>{p.position.z+=worldVelocity*dt;if(p.position.z>13)p.po
 traffic.forEach(o=>{
  const u=o.userData,lanes=u.oncoming?opposingLanes:sameLanes;
  u.changeCooldown=Math.max(0,u.changeCooldown-dt);
+ u.collisionCooldown=Math.max(0,u.collisionCooldown-dt);
  // Same-direction traffic ahead has smaller Z; oncoming traffic ahead has larger Z.
  const isAhead=t=>u.oncoming?t.position.z>o.position.z:t.position.z<o.position.z;
  const nearestAhead=()=>traffic.filter(t=>t!==o&&t.userData.oncoming===u.oncoming&&Math.abs(t.position.x-o.position.x)<1.45&&isAhead(t))
@@ -129,18 +130,22 @@ traffic.forEach(o=>{
    // Slow that AI vehicle; never reduce the player's speed or throttle for this impact.
    const rearImpact=!u.oncoming&&previousZ>player.position.z;
    o.position.z=player.position.z+(rearImpact?2.65:-2.65);
-   if(hitLock<=0){
-     if(rearImpact){
-       u.speed=Math.min(u.speed,Math.max(12,Math.abs(worldVelocity)*.5));
+   if(rearImpact){
+     // Cooldown belongs to this AI vehicle, not the whole traffic system.
+     // Every car that actually hits from behind gets its own speed penalty.
+     if(u.collisionCooldown<=0){
+       u.speed=Math.min(u.speed,Math.max(12,Math.abs(speed)*.5));
        u.changeCooldown=Math.max(u.changeCooldown,1.2);
-       say('Rear impact! AI car slowed');
-     }else{
-       speed*=.42;
-       collisionRecovery=.7;
-       throttleResponse=0;
-       coins=Math.max(0,coins-1);$('coins').textContent=coins;
-       say('Collision! Slow down and regain control');
+       u.collisionCooldown=1.3;
+       say('Rear impact! This AI car slowed');
      }
+   }else if(hitLock<=0){
+     // Preserve the previous response for non-rear collisions.
+     speed*=.42;
+     collisionRecovery=.7;
+     throttleResponse=0;
+     coins=Math.max(0,coins-1);$('coins').textContent=coins;
+     say('Collision! Slow down and regain control');
      hitLock=1.3;
    }
  }

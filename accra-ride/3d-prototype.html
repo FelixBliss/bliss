@@ -49,7 +49,7 @@ const traffic=[];const colors=[0xd94b40,0x287cb6,0xe4e4dc,0x3b4a54,0xe3a34b,0x4b
 const sameLanes=[2.75,6.25],opposingLanes=[-6.25,-2.75];
 function addTraffic(z,lane,oncoming=false,bike=false,startsBehind=false){const o=car(bike?0x262d31:colors[Math.floor(Math.random()*colors.length)],bike);o.position.set(lane,0,z);const baseSpeed=oncoming?72+Math.random()*43:bike?82+Math.random()*48:62+Math.random()*66;o.userData={lane,targetLane:lane,homeLane:lane,oncoming,bike,baseZ:z,startsBehind,speed:baseSpeed,overtaking:false,passTarget:null,changeCooldown:.25+Math.random()*1.1};scene.add(o);traffic.push(o)}
 // Denser highway flow: varied speeds let some vehicles pull ahead while others are passed.
-for(let i=0;i<12;i++){addTraffic(-18-i*(16+Math.random()*5),sameLanes[Math.floor(Math.random()*sameLanes.length)],false,i===3||i===6||i===9);addTraffic(-29-i*(17+Math.random()*5),opposingLanes[Math.floor(Math.random()*opposingLanes.length)],true,i===5)}
+for(let i=0;i<12;i++){addTraffic(-28-i*(25+Math.random()*7),sameLanes[Math.floor(Math.random()*sameLanes.length)],false,i===3||i===6||i===9);addTraffic(-34-i*(27+Math.random()*7),opposingLanes[Math.floor(Math.random()*opposingLanes.length)],true,i===5)}
 // A few faster same-direction vehicles begin behind the player and can catch up to overtake.
 for(let i=0;i<3;i++){addTraffic(30+i*24,sameLanes[i%sameLanes.length],false,i===1,true)}
 // Simple junction with cross street and working traffic signal.
@@ -58,7 +58,7 @@ const pole=box(.16,4,.16,mat(0x343a3d),-7,1.8,junctionZ-4);const signal=box(.6,1
 let lightPhase=0,lightTime=0,redWarning=false;
 let speed=0,steer=0,steerTarget=0,lateralVelocity=0,gas=false,brake=false,reverse=false,active=false,coins=20,hitLock=0,collisionRecovery=0,driveDistance=0,last=performance.now(),wheelTouch=null,gasLevel=0,brakeLevel=0,throttleResponse=0,cameraMode=0,lightsOn=false,audioCtx=null,engineOsc=null,engineGain=null,hornOsc=null,hornGain=null;
 function say(t){$('toast').textContent=t;$('toast').style.opacity=1;clearTimeout(say.timer);say.timer=setTimeout(()=>$('toast').style.opacity=0,1800)}
-function reset(){speed=0;steer=0;steerTarget=0;lateralVelocity=0;world.position.z=0;gas=false;brake=false;collisionRecovery=0;gasLevel=0;brakeLevel=0;throttleResponse=0;driveDistance=0;redWarning=false;reverse=false;$('gear').textContent='GEAR: D';player.position.set(2.75,0,3.1);coins=20;$('coins').textContent=coins;traffic.forEach((o,i)=>{const u=o.userData;o.position.z=u.startsBehind?u.baseZ:u.oncoming?-29-i*19:-18-i*18;u.lane=u.oncoming?opposingLanes[i%2]:sameLanes[i%2];u.homeLane=u.lane;u.targetLane=u.lane;u.overtaking=false;u.passTarget=null;u.speed=u.baseSpeed;u.changeCooldown=.4+Math.random()*1.2;o.position.x=u.lane});say('Accelerate to build speed; brake for red lights')}
+function reset(){speed=0;steer=0;steerTarget=0;lateralVelocity=0;world.position.z=0;gas=false;brake=false;collisionRecovery=0;gasLevel=0;brakeLevel=0;throttleResponse=0;driveDistance=0;redWarning=false;reverse=false;$('gear').textContent='GEAR: D';player.position.set(2.75,0,3.1);coins=20;$('coins').textContent=coins;traffic.forEach((o,i)=>{const u=o.userData;const sameIndex=Math.floor(i/2);o.position.z=u.startsBehind?u.baseZ:u.oncoming?-34-sameIndex*28:-28-sameIndex*28;u.lane=u.oncoming?opposingLanes[i%2]:sameLanes[i%2];u.homeLane=u.lane;u.targetLane=u.lane;u.overtaking=false;u.passTarget=null;u.speed=u.baseSpeed;u.changeCooldown=.4+Math.random()*1.2;o.position.x=u.lane});say('Accelerate to build speed; brake for red lights')}
 function bindHold(id,fn,levelSetter){const e=$(id);let heldPointer=null;const down=ev=>{ev.preventDefault();ev.stopPropagation();if(heldPointer!==null)return;heldPointer=ev.pointerId;e.classList.add('down');fn(true);levelSetter(1);try{e.setPointerCapture(ev.pointerId)}catch{}};const up=ev=>{if(ev&&heldPointer!==null&&ev.pointerId!==heldPointer)return;if(ev)ev.preventDefault();heldPointer=null;e.classList.remove('down');fn(false);levelSetter(0)};e.addEventListener('pointerdown',down);['pointerup','pointercancel','lostpointercapture'].forEach(n=>e.addEventListener(n,up));e.addEventListener('contextmenu',ev=>ev.preventDefault())}
 bindHold('gas',v=>gas=v,v=>gasLevel=v);bindHold('brake',v=>brake=v,v=>brakeLevel=v);
 $('gear').addEventListener('click',()=>{if(Math.abs(speed)>2){say('Brake to a near stop before changing gear');return}reverse=!reverse;$('gear').textContent=reverse?'GEAR: R':'GEAR: D';say(reverse?'Reverse selected — hold ACCEL':'Drive selected — hold ACCEL')});
@@ -113,7 +113,7 @@ traffic.forEach(o=>{
  const finalAhead=nearestAhead();
  if(finalAhead){const gap=Math.abs(finalAhead.position.z-o.position.z);if(gap<6)v=Math.min(v,Math.max(0,finalAhead.userData.speed-((6-gap)*3)))}
  const previousZ=o.position.z;
- const dz=u.oncoming?(Math.abs(worldVelocity)+v)*dt:(v-worldVelocity)*dt;
+ const trafficWorldSpeed=paceOf(v)*.45;const dz=u.oncoming?(Math.abs(worldVelocity)+trafficWorldSpeed)*dt:(trafficWorldSpeed-worldVelocity)*dt;
  let nextZ=o.position.z+dz;
  if(finalAhead){if(u.oncoming&&nextZ>finalAhead.position.z-4.6)nextZ=finalAhead.position.z-4.6;if(!u.oncoming&&nextZ<finalAhead.position.z+4.6)nextZ=finalAhead.position.z+4.6}
  o.position.z=nextZ;

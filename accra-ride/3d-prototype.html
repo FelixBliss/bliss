@@ -26,20 +26,20 @@ const asphalt=mat(0x343b40),grass=mat(0x789c62),line=mat(0xf4f0db),yellow=mat(0x
 const boxGeometryCache=new Map();function box(w,h,d,material,x,y,z,parent=world){const key=w+'|'+h+'|'+d;let geometry=boxGeometryCache.get(key);if(!geometry){geometry=new THREE.BoxGeometry(w,h,d);boxGeometryCache.set(key,geometry)}const o=new THREE.Mesh(geometry,material);o.position.set(x,y,z);o.castShadow=false;o.receiveShadow=false;parent.add(o);return o;}
 // A gently winding highway centreline; all road furniture follows the same curve.
 const roadCenter=z=>3.4*Math.sin(z/720)+1.15*Math.sin(z/245);
-function ribbon(width,offset,y,material){const g=new THREE.BufferGeometry(),verts=[],idx=[];for(let z=20;z>=-50020;z-=10){const cx=roadCenter(z)+offset;verts.push(cx-width/2,y,z,cx+width/2,y,z)}for(let i=0;i<verts.length/6-1;i++){const a=i*2;idx.push(a,a+1,a+2,a+1,a+3,a+2)}g.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));g.setIndex(idx);g.computeVertexNormals();const mesh=new THREE.Mesh(g,material);mesh.frustumCulled=false;world.add(mesh);return mesh}
+function ribbon(width,offset,y,material){const g=new THREE.BufferGeometry(),verts=[],idx=[];for(let z=20;z>=-3020;z-=10){const cx=roadCenter(z)+offset;verts.push(cx-width/2,y,z,cx+width/2,y,z)}for(let i=0;i<verts.length/6-1;i++){const a=i*2;idx.push(a,a+1,a+2,a+1,a+3,a+2)}g.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));g.setIndex(idx);g.computeVertexNormals();const mesh=new THREE.Mesh(g,material);mesh.frustumCulled=false;world.add(mesh);return mesh}
 ribbon(160,0,-.25,grass);ribbon(16,0,-.12,asphalt);
 ribbon(.7,-8.45,-.02,sidewalk);ribbon(.7,8.45,-.02,sidewalk);
 ribbon(.13,-7.8,-.015,line);ribbon(.13,7.8,-.015,line);
 // Dashed lane dividers follow the bend instead of cutting across the grass.
-for(const x of [-4.5,4.5])for(let z=20;z>-50000;z-=20)box(.11,.018,10.5,line,roadCenter(z)+x,-.025,z);
+for(const x of [-4.5,4.5])for(let z=20;z>-3000;z-=20)box(.11,.018,10.5,line,roadCenter(z)+x,-.025,z);
 // Raised landscaped median and pedestrian walkways.
 ribbon(1.8,0,.015,grass);ribbon(.12,-.98,.025,sidewalk);ribbon(.12,.98,.025,sidewalk);
 const medianFlowers=[];const flowerColors=[0xe85b78,0xf2bd42,0xffffff,0xb68bea];
 for(let i=0;i<22;i++){const p=new THREE.Group();p.position.set(0,0,-18-i*11);box(.95,.12,1.35,mat(0x68745a),0,.07,0,p);for(let j=0;j<3;j++){box(.035,.14,.035,mat(0x3c7c43),-.28+j*.28,.19,0,p);const bloom=new THREE.Mesh(new THREE.SphereGeometry(.075,7,6),mat(flowerColors[(i+j)%flowerColors.length]));bloom.position.set(-.28+j*.28,.31,0);p.add(bloom)}scene.add(p);medianFlowers.push(p)}
 function building(x,z,w,h,d,c){const b=box(w,h,d,mat(c),x,h/2-.12,z);for(let yy=1.2;yy<h-0.5;yy+=1.5)for(let xx=-w/2+.5;xx<w/2-.2;xx+=1.1){box(.42,.55,.035,glass,x+xx,yy,z+d/2+.02,b.parent)}}
-for(let z=15;z>-49980;z-=30){building(roadCenter(z)-11,z,4+Math.random()*3,5+Math.random()*15,5,[0xc4b8a3,0xd1c6b5,0x9caeaf,0xd9d1bd][Math.floor(Math.random()*4)]);building(roadCenter(z-5)+11,z-5,4+Math.random()*3,6+Math.random()*13,5,[0xc4b8a3,0xd1c6b5,0x9caeaf,0xd9d1bd][Math.floor(Math.random()*4)])}
+for(let z=15;z>-2980;z-=30){building(roadCenter(z)-11,z,4+Math.random()*3,5+Math.random()*15,5,[0xc4b8a3,0xd1c6b5,0x9caeaf,0xd9d1bd][Math.floor(Math.random()*4)]);building(roadCenter(z-5)+11,z-5,4+Math.random()*3,6+Math.random()*13,5,[0xc4b8a3,0xd1c6b5,0x9caeaf,0xd9d1bd][Math.floor(Math.random()*4)])}
 // Occasional roadside lay-bys with parked vehicles, signs and raised ramp/crossover details.
-for(let z=-95;z>-48000;z-=310+Math.random()*150){
+for(let z=-95;z>-2800;z-=310+Math.random()*150){
  const side=Math.random()<.5?-1:1,parked=car(colors[Math.floor(Math.random()*colors.length)]);world.add(parked);parked.position.set(roadCenter(z)+side*10.05,0,z);parked.rotation.y=side<0?Math.PI:0;
  const pole=box(.12,2.3,.12,mat(0x646b6d),roadCenter(z-14)+side*9.5,1.05,z-14);
  const board=box(1.25,.85,.12,mat([0x277b50,0x2268a4,0xe7b83d][Math.floor(Math.random()*3)]),roadCenter(z-14)+side*9.5,2.35,z-14);

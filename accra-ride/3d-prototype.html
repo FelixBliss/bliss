@@ -11,7 +11,7 @@
 <script>
 (()=> {
 const $=id=>document.getElementById(id);
-const MAX_KMH=120, MAX_REVERSE=28, PACE_MAX=70, PACE_EXP=1.0;
+const MAX_KMH=120, PACE_MAX=70, PACE_EXP=1.0;
 const paceOf=kmh=>PACE_MAX*Math.pow(Math.min(1,Math.abs(kmh)/MAX_KMH),PACE_EXP);
 if(!window.THREE){$('mission').textContent='3D engine could not load — check internet connection';return;}
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x9acde6);scene.fog=new THREE.Fog(0x9acde6,65,240);
@@ -63,7 +63,7 @@ if(Math.abs(speed)>.1){const drag=.006*Math.abs(speed)+.00016*speed*speed;speed-
 if(brake&&Math.abs(speed)>.05){const decel=reverse?30:34;speed-=Math.sign(speed)*decel*Math.max(.35,brakeLevel)*dt}
 speed=Math.max(reverse?-28:0,Math.min(maxSpeed,speed));
 // Convert displayed km/h into world speed, then model steering as lateral acceleration with grip.
-const speedPace=PACE_MAX*Math.pow(Math.min(1,Math.abs(speed)/MAX_KMH),PACE_EXP);const move=Math.sign(speed)*speedPace*dt;const worldVelocity=dt>0?move/dt:0;driveDistance+=Math.abs(move);world.position.z+=move;
+const speedPace=paceOf(speed);const move=Math.sign(speed)*speedPace*dt;const worldVelocity=dt>0?move/dt:0;driveDistance+=Math.abs(move);world.position.z+=move;
 const steeringAuthority=.18*Math.max(5,Math.abs(speed));lateralVelocity+=(steer*steeringAuthority-lateralVelocity*1.9)*dt;
 player.position.x+=lateralVelocity*dt; if(player.position.x < -4.25 || player.position.x > 4.25){player.position.x=Math.max(-4.25,Math.min(4.25,player.position.x));lateralVelocity=0}
 player.rotation.y=Math.max(-.22,Math.min(.22,-lateralVelocity*.035));player.position.z=3.1;

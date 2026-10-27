@@ -94,7 +94,7 @@ traffic.forEach(o=>{
    .sort((a,b)=>Math.abs(a.position.z-o.position.z)-Math.abs(b.position.z-o.position.z))[0];
  let aheadInLane=nearestAhead(),v=u.speed;
  if(aheadInLane){const gap=Math.abs(aheadInLane.position.z-o.position.z);if(gap<8)v=Math.min(v,Math.max(0,aheadInLane.userData.speed-((8-gap)*2.5)))}
- const closeAhead=aheadInLane&&aheadInLane.userData.speed<u.speed-7&&Math.abs(aheadInLane.position.z-o.position.z)<28;
+ const closeAhead=aheadInLane&&aheadInLane.userData.speed<u.speed-4&&Math.abs(aheadInLane.position.z-o.position.z)<30;
  if(closeAhead&&!u.overtaking&&u.changeCooldown<=0){
    const otherLane=lanes.find(x=>Math.abs(x-u.lane)>1);
    const laneClear=otherLane!==undefined&&!traffic.some(t=>t!==o&&t.userData.oncoming===u.oncoming&&Math.abs(t.position.x-otherLane)<1.6&&Math.abs(t.position.z-o.position.z)<13);

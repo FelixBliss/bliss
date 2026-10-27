@@ -31,13 +31,13 @@ ribbon(160,0,-.25,grass);ribbon(16,0,-.12,asphalt);
 ribbon(.7,-8.45,-.02,sidewalk);ribbon(.7,8.45,-.02,sidewalk);
 ribbon(.13,-7.8,-.015,line);ribbon(.13,7.8,-.015,line);
 // Dashed lane dividers follow the bend instead of cutting across the grass.
-for(const x of [-4.5,4.5])for(let z=20;z>-50000;z-=20)box(.11,.018,10.5,line,roadCenter(z)+x,-.025,z);
+for(const x of [-4.5,4.5]){const verts=[],indices=[];for(let z=20;z>-50000;z-=20){const z2=Math.max(-50000,z-10.5),c1=roadCenter(z)+x,c2=roadCenter(z2)+x,w=.055,base=verts.length/3;verts.push(c1-w,-.025,z,c1+w,-.025,z,c2-w,-.025,z2,c2+w,-.025,z2);indices.push(base,base+2,base+1,base+1,base+2,base+3)}const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));g.setIndex(indices);g.computeVertexNormals();const marks=new THREE.Mesh(g,line);marks.frustumCulled=false;world.add(marks)}
 // Raised landscaped median and pedestrian walkways.
 ribbon(1.8,0,.015,grass);ribbon(.12,-.98,.025,sidewalk);ribbon(.12,.98,.025,sidewalk);
 const medianFlowers=[];const flowerColors=[0xe85b78,0xf2bd42,0xffffff,0xb68bea];
 for(let i=0;i<22;i++){const p=new THREE.Group();p.position.set(0,0,-18-i*11);box(.95,.12,1.35,mat(0x68745a),0,.07,0,p);for(let j=0;j<3;j++){box(.035,.14,.035,mat(0x3c7c43),-.28+j*.28,.19,0,p);const bloom=new THREE.Mesh(new THREE.SphereGeometry(.075,7,6),mat(flowerColors[(i+j)%flowerColors.length]));bloom.position.set(-.28+j*.28,.31,0);p.add(bloom)}scene.add(p);medianFlowers.push(p)}
 function building(x,z,w,h,d,c){const b=box(w,h,d,mat(c),x,h/2-.12,z);for(let yy=1.2;yy<h-0.5;yy+=1.5)for(let xx=-w/2+.5;xx<w/2-.2;xx+=1.1){box(.42,.55,.035,glass,x+xx,yy,z+d/2+.02,b.parent)}}
-for(let z=15;z>-49980;z-=30){building(roadCenter(z)-11,z,4+Math.random()*3,5+Math.random()*15,5,[0xc4b8a3,0xd1c6b5,0x9caeaf,0xd9d1bd][Math.floor(Math.random()*4)]);building(roadCenter(z-5)+11,z-5,4+Math.random()*3,6+Math.random()*13,5,[0xc4b8a3,0xd1c6b5,0x9caeaf,0xd9d1bd][Math.floor(Math.random()*4)])}
+for(let z=15;z>-6500;z-=55){building(roadCenter(z)-11,z,4+Math.random()*3,5+Math.random()*15,5,[0xc4b8a3,0xd1c6b5,0x9caeaf,0xd9d1bd][Math.floor(Math.random()*4)]);building(roadCenter(z-5)+11,z-5,4+Math.random()*3,6+Math.random()*13,5,[0xc4b8a3,0xd1c6b5,0x9caeaf,0xd9d1bd][Math.floor(Math.random()*4)])}
 // Occasional roadside lay-bys with parked vehicles, signs and raised ramp/crossover details.
 for(let z=-95;z>-48000;z-=310+Math.random()*150){
  const side=Math.random()<.5?-1:1,parked=car(colors[Math.floor(Math.random()*colors.length)]);world.add(parked);parked.position.set(roadCenter(z)+side*10.05,0,z);parked.rotation.y=side<0?Math.PI:0;
@@ -137,7 +137,7 @@ const cm=cameraModes[cameraMode];camera.position.x+=(player.position.x+cm.x-came
 $('speed').textContent=Math.round(Math.abs(speed));$('mission').textContent=(reverse?'REVERSE GEAR':'DRIVE')+' · '+(junctionDistance<34?(lightPhase===0?'RED LIGHT AHEAD':lightPhase===1?'AMBER LIGHT':'GREEN LIGHT'):(lightPhase===0?'RED LIGHT':lightPhase===1?'AMBER LIGHT':'GREEN LIGHT'))+' · '+Math.round(driveDistance)+' m';
 }
 function animate(now){requestAnimationFrame(animate);const elapsed=(now-last)/1000;const dt=Math.min(.033,Math.max(.001,elapsed||.016));last=now;if(active)update(dt);renderer.render(scene,camera)}requestAnimationFrame(animate);
-$('start').addEventListener('click',()=>{$('startcover').style.display='none';startAudio();active=true;reset()});
+$('start').addEventListener('click',ev=>{ev.preventDefault();$('start').disabled=true;$('start').textContent='STARTING…';try{$('startcover').style.display='none';reset();active=true;try{startAudio()}catch(audioError){console.warn('Audio unavailable; continuing without sound',audioError)} }catch(err){active=false;$('startcover').style.display='grid';$('start').disabled=false;$('start').textContent='TRY AGAIN';$('mission').textContent='Could not start the drive. Reload and try again.';console.error('AccraRide start failed',err)} });
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.fov=innerWidth>innerHeight?72:66;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.7))});
 })();
 </script></body></html>

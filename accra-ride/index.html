@@ -66,7 +66,7 @@ let signalPhase=roadScroll%1800;if(light==="red"&&signalPhase>1070&&signalPhase<
 if(!missionDone&&!passenger&&elapsed>18&&!missionShown){missionShown=true;pickupAt=roadScroll+520;$("mission").textContent="PASSENGER AHEAD";$("mission").style.display="block"}
 if(missionShown&&!passenger&&!missionDone){
  let d=pickupAt-roadScroll;
- if(d < -65){pickupAt=roadScroll+360;d=pickupAt-roadScroll;say("Pickup missed — a new passenger stop is ahead")}
+ if(d < -65){}
  let near=d<95&&d>-65;
  $("mission").style.display="block";$("mission").textContent=near?(speed<5?"TAP TO PICK UP":"STOP TO PICK UP"):"PASSENGER AHEAD";
 }

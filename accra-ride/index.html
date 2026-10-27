@@ -72,7 +72,7 @@ if(missionShown&&!passenger&&!missionDone){
 }
 if(passenger&&!missionDone){
  let d=dropoffAt-roadScroll;
- if(d < -65){dropoffAt=roadScroll+420;d=dropoffAt-roadScroll;say("Drop-off missed — follow the road to the next stop")}
+ if(d < -65){/* keep original stop position */d=dropoffAt-roadScroll;say("Drop-off missed — follow the road to the next stop")}
  let near=d<95&&d>-65;
  $("mission").style.display="block";$("mission").textContent=near?(speed<5?"TAP TO DROP OFF":"STOP TO DROP OFF"):"DRIVE TO DROP-OFF";
 }

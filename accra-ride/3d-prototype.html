@@ -61,7 +61,7 @@ if(Math.abs(speed)>.1){const drag=.006*Math.abs(speed)+.00016*speed*speed;speed-
 if(brake&&Math.abs(speed)>.05){const decel=reverse?30:34;speed-=Math.sign(speed)*decel*Math.max(.35,brakeLevel)*dt}
 speed=Math.max(reverse?-28:0,Math.min(maxSpeed,speed));
 // Convert displayed km/h into world speed, then model steering as lateral acceleration with grip.
-const speedRatio=Math.min(1,Math.abs(speed)/120);const speedPace=Math.abs(speed)*.12+Math.pow(speedRatio,2)*25;const move=Math.sign(speed)*speedPace*dt;const worldVelocity=dt>0?move/dt:0;driveDistance+=Math.abs(move);world.position.z+=move;
+const speedRatio=Math.min(1,Math.abs(speed)/120);const speedPace=70*Math.pow(speedRatio,.83);const move=Math.sign(speed)*speedPace*dt;const worldVelocity=dt>0?move/dt:0;driveDistance+=Math.abs(move);world.position.z+=move;
 const steeringAuthority=.18*Math.max(5,Math.abs(speed));lateralVelocity+=(steer*steeringAuthority-lateralVelocity*1.9)*dt;
 player.position.x+=lateralVelocity*dt; if(player.position.x < -4.25 || player.position.x > 4.25){player.position.x=Math.max(-4.25,Math.min(4.25,player.position.x));lateralVelocity=0}
 player.rotation.y=Math.max(-.22,Math.min(.22,-lateralVelocity*.035));player.position.z=3.1;

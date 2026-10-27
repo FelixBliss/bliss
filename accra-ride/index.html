@@ -65,12 +65,16 @@ let signalPhase=roadScroll%1800;if(light==="red"&&signalPhase>1070&&signalPhase<
 // Passenger stops are tied to visible road positions, not an elapsed-time auto-delivery.
 if(!missionDone&&!passenger&&elapsed>18&&!missionShown){missionShown=true;pickupAt=roadScroll+520;$("mission").textContent="PASSENGER AHEAD";$("mission").style.display="block"}
 if(missionShown&&!passenger&&!missionDone){
- let d=pickupAt-roadScroll,near=d<95&&d>-65;
- $("mission").style.display="block";$("mission").textContent=near?(speed<5?"TAP TO PICK UP":"STOP TO PICK UP"):(d>=0?"PASSENGER AHEAD":"MISSED PICKUP — CONTINUE");
+ let d=pickupAt-roadScroll;
+ if(d < -65){pickupAt=roadScroll+360;d=pickupAt-roadScroll;say("Pickup missed — a new passenger stop is ahead")}
+ let near=d<95&&d>-65;
+ $("mission").style.display="block";$("mission").textContent=near?(speed<5?"TAP TO PICK UP":"STOP TO PICK UP"):"PASSENGER AHEAD";
 }
 if(passenger&&!missionDone){
- let d=dropoffAt-roadScroll,near=d<95&&d>-65;
- $("mission").style.display="block";$("mission").textContent=near?(speed<5?"TAP TO DROP OFF":"STOP TO DROP OFF"):(d>=0?"DRIVE TO DROP-OFF":"DROP-OFF MISSED — CONTINUE");
+ let d=dropoffAt-roadScroll;
+ if(d < -65){dropoffAt=roadScroll+420;d=dropoffAt-roadScroll;say("Drop-off missed — follow the road to the next stop")}
+ let near=d<95&&d>-65;
+ $("mission").style.display="block";$("mission").textContent=near?(speed<5?"TAP TO DROP OFF":"STOP TO DROP OFF"):"DRIVE TO DROP-OFF";
 }
 // Traffic simulation: vehicles brake for a red signal and queue behind stopped traffic.
 let signalPhaseNow=roadScroll%1800,signalVisible=signalPhaseNow>1000&&signalPhaseNow<1440;

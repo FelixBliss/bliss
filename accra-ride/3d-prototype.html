@@ -109,6 +109,7 @@ traffic.forEach(o=>{
  o.position.x+=Math.sign(u.targetLane-o.position.x)*Math.min(Math.abs(u.targetLane-o.position.x),3.4*dt);
  const finalAhead=nearestAhead();
  if(finalAhead){const gap=Math.abs(finalAhead.position.z-o.position.z);if(gap<6)v=Math.min(v,Math.max(0,finalAhead.userData.speed-((6-gap)*3)))}
+ const previousZ=o.position.z;
  const dz=u.oncoming?(Math.abs(worldVelocity)+v)*dt:(worldVelocity-v)*dt;
  let nextZ=o.position.z+dz;
  if(finalAhead){if(u.oncoming&&nextZ>finalAhead.position.z-4.6)nextZ=finalAhead.position.z-4.6;if(!u.oncoming&&nextZ<finalAhead.position.z+4.6)nextZ=finalAhead.position.z+4.6}
@@ -116,7 +117,20 @@ traffic.forEach(o=>{
  if(u.oncoming&&o.position.z>13){o.position.z=-165-Math.random()*70;u.lane=lanes[Math.floor(Math.random()*lanes.length)];u.homeLane=u.lane;u.targetLane=u.lane;u.overtaking=false;u.passTarget=null;o.position.x=u.lane}
  else if(!u.oncoming&&o.position.z>13){o.position.z=-165-Math.random()*70;u.lane=lanes[Math.floor(Math.random()*lanes.length)];u.homeLane=u.lane;u.targetLane=u.lane;u.overtaking=false;u.passTarget=null;o.position.x=u.lane}
  else if(!u.oncoming&&o.position.z< -250)o.position.z=-35-Math.random()*160;
- if(hitLock<=0&&Math.abs(o.position.z-player.position.z)<1.8&&Math.abs(o.position.x-player.position.x)<1.25){coins=Math.max(0,coins-1);$('coins').textContent=coins;hitLock=1.3;say('Collision! −1 coin')}
+ const lateralGap=Math.abs(o.position.x-player.position.x);
+ const longitudinalGap=Math.abs(o.position.z-player.position.z);
+ const crossedPlayer=(previousZ-player.position.z)*(o.position.z-player.position.z)<=0;
+ // Swept, axis-aligned vehicle contact: catch frame-to-frame crossings as well as overlap.
+ if(lateralGap<1.55&&(longitudinalGap<2.65||crossedPlayer)){
+   const wasAhead=previousZ<player.position.z;
+   o.position.z=player.position.z+(wasAhead?-2.65:2.65);
+   if(hitLock<=0){
+     speed*=.42;
+     throttleResponse=0;
+     coins=Math.max(0,coins-1);$('coins').textContent=coins;
+     hitLock=1.3;say('Collision! Slow down and regain control');
+   }
+ }
 });if(hitLock>0)hitLock-=dt;
 const junctionDistance=Math.abs(player.position.z-(junctionZ+world.position.z));if(lightPhase===0&&junctionDistance<30&&junctionDistance>4&&!redWarning){say('RED LIGHT AHEAD — brake and stop safely');redWarning=true}if(junctionDistance>34)redWarning=false;
 const cm=cameraModes[cameraMode];camera.position.x+=(player.position.x+cm.x-camera.position.x)*Math.min(1,dt*4);camera.position.y+=(cm.y+Math.min(1,Math.abs(speed)/90)*.25-camera.position.y)*Math.min(1,dt*4);camera.position.z+=(player.position.z+cm.z-camera.position.z)*Math.min(1,dt*4);camera.lookAt(player.position.x*.65,cm.name==='HOOD'?1.2:1.35,player.position.z+cm.lookZ);

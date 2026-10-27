@@ -51,7 +51,7 @@ for(let v of [...cars].sort((a,b)=>a.y-b.y)){if(v.y<-.15||v.y>1.18)continue;let 
 let stopDistance=passenger?dropoffAt-roadScroll:pickupAt-roadScroll;
 if((missionShown&&!passenger&&!missionDone)||(passenger&&!missionDone)){
  if(stopDistance>-80&&stopDistance<850){
-  let sy=H*(.19+clamp(stopDistance/850,0,1)*.91),rr=road(sy),side=passenger?1:-1,sx=rr.cx+side*(rr.half*.82);
+  let sy=H*(.19+(1-clamp(stopDistance/850,0,1))*.63),rr=road(sy),side=passenger?1:-1,sx=rr.cx+side*(rr.half*.82);
   g.fillStyle='#25353c';g.fillRect(sx-2,sy-28,4,30);rounded(sx-22,sy-48,44,22,4,passenger?'#1668a8':'#087b56');
   g.fillStyle='#fff';g.font='bold 10px system-ui';g.textAlign='center';g.fillText(passenger?'DROP':'PICK UP',sx,sy-33);
   g.fillStyle='#f8e9a4';g.beginPath();g.arc(sx,sy-15,5,0,7);g.fill();

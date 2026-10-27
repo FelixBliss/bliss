@@ -58,7 +58,7 @@ const pole=box(.16,4,.16,mat(0x343a3d),-7,1.8,junctionZ-4);const signal=box(.6,1
 let lightPhase=0,lightTime=0,redWarning=false;
 let speed=0,steer=0,steerTarget=0,lateralVelocity=0,gas=false,brake=false,reverse=false,active=false,coins=20,hitLock=0,collisionRecovery=0,driveDistance=0,last=performance.now(),wheelTouch=null,gasLevel=0,brakeLevel=0,throttleResponse=0,cameraMode=0,lightsOn=false,audioCtx=null,engineOsc=null,engineGain=null,hornOsc=null,hornGain=null;
 function say(t){$('toast').textContent=t;$('toast').style.opacity=1;clearTimeout(say.timer);say.timer=setTimeout(()=>$('toast').style.opacity=0,1800)}
-function reset(){speed=0;steer=0;steerTarget=0;lateralVelocity=0;gas=false;brake=false;collisionRecovery=0;gasLevel=0;brakeLevel=0;throttleResponse=0;driveDistance=0;redWarning=false;reverse=false;$('gear').textContent='GEAR: D';player.position.set(2.75,0,3.1);coins=20;$('coins').textContent=coins;traffic.forEach((o,i)=>{const u=o.userData;o.position.z=u.startsBehind?30+i*22:u.oncoming?-29-i*19:-18-i*18;u.lane=u.oncoming?opposingLanes[i%2]:sameLanes[i%2];u.homeLane=u.lane;u.targetLane=u.lane;u.overtaking=false;u.passTarget=null;u.speed=u.baseSpeed;u.changeCooldown=.4+Math.random()*1.2;o.position.x=u.lane});say('Accelerate to build speed; brake for red lights')}
+function reset(){speed=0;steer=0;steerTarget=0;lateralVelocity=0;gas=false;brake=false;collisionRecovery=0;gasLevel=0;brakeLevel=0;throttleResponse=0;driveDistance=0;redWarning=false;reverse=false;$('gear').textContent='GEAR: D';player.position.set(2.75,0,3.1);coins=20;$('coins').textContent=coins;traffic.forEach((o,i)=>{const u=o.userData;o.position.z=u.startsBehind?u.baseZ:u.oncoming?-29-i*19:-18-i*18;u.lane=u.oncoming?opposingLanes[i%2]:sameLanes[i%2];u.homeLane=u.lane;u.targetLane=u.lane;u.overtaking=false;u.passTarget=null;u.speed=u.baseSpeed;u.changeCooldown=.4+Math.random()*1.2;o.position.x=u.lane});say('Accelerate to build speed; brake for red lights')}
 function bindHold(id,fn,levelSetter){const e=$(id);let heldPointer=null;const down=ev=>{ev.preventDefault();ev.stopPropagation();if(heldPointer!==null)return;heldPointer=ev.pointerId;e.classList.add('down');fn(true);levelSetter(1);try{e.setPointerCapture(ev.pointerId)}catch{}};const up=ev=>{if(ev&&heldPointer!==null&&ev.pointerId!==heldPointer)return;if(ev)ev.preventDefault();heldPointer=null;e.classList.remove('down');fn(false);levelSetter(0)};e.addEventListener('pointerdown',down);['pointerup','pointercancel','lostpointercapture'].forEach(n=>e.addEventListener(n,up));e.addEventListener('contextmenu',ev=>ev.preventDefault())}
 bindHold('gas',v=>gas=v,v=>gasLevel=v);bindHold('brake',v=>brake=v,v=>brakeLevel=v);
 $('gear').addEventListener('click',()=>{if(Math.abs(speed)>2){say('Brake to a near stop before changing gear');return}reverse=!reverse;$('gear').textContent=reverse?'GEAR: R':'GEAR: D';say(reverse?'Reverse selected — hold ACCEL':'Drive selected — hold ACCEL')});
@@ -125,7 +125,7 @@ traffic.forEach(o=>{
  const crossedPlayer=(previousZ-player.position.z)*(o.position.z-player.position.z)<=0;
  // Separate both vehicles at contact; only the vehicle that caused the impact loses speed.
  if(lateralGap<1.55&&(longitudinalGap<2.65||crossedPlayer)){
-   const aiBehind=o.position.z>player.position.z;
+   const aiBehind=previousZ>player.position.z;
    o.position.z=player.position.z+(aiBehind?2.65:-2.65);
    if(hitLock<=0){
      if(aiBehind){

@@ -91,7 +91,7 @@ traffic.forEach(o=>{
  // Follow traffic at a safe gap; this prevents vehicles from occupying the same space.
  const directionSign=u.oncoming?1:-1;
  const aheadInLane=traffic.filter(t=>t!==o&&t.userData.oncoming===u.oncoming&&Math.abs(t.position.x-o.position.x)<1.35&&
-   (u.oncoming?t.position.z>o.position.z:t.position.z<o.position.z))
+   t.position.z>o.position.z)
    .sort((a,b)=>Math.abs(a.position.z-o.position.z)-Math.abs(b.position.z-o.position.z))[0];
  let v=u.speed;
  if(aheadInLane){
@@ -118,7 +118,7 @@ traffic.forEach(o=>{
  o.position.x+=Math.sign(u.targetLane-o.position.x)*Math.min(Math.abs(u.targetLane-o.position.x),2.2*dt);
  // Recalculate following gap after a lane change and cap movement before cars can overlap.
  const finalAhead=traffic.filter(t=>t!==o&&t.userData.oncoming===u.oncoming&&Math.abs(t.position.x-o.position.x)<1.45&&
-   (u.oncoming?t.position.z>o.position.z:t.position.z<o.position.z))
+   t.position.z>o.position.z)
    .sort((a,b)=>Math.abs(a.position.z-o.position.z)-Math.abs(b.position.z-o.position.z))[0];
  if(finalAhead){
    const gap=Math.abs(finalAhead.position.z-o.position.z);
@@ -126,8 +126,8 @@ traffic.forEach(o=>{
  }
  const dz=u.oncoming?(Math.abs(worldVelocity)+v)*dt:(worldVelocity-v)*dt;
  let nextZ=o.position.z+dz;
- if(finalAhead&&Math.abs(finalAhead.position.z-nextZ)<4.6){
-   nextZ=u.oncoming?finalAhead.position.z-4.6:finalAhead.position.z+4.6;
+ if(finalAhead&&nextZ>finalAhead.position.z-4.6){
+   nextZ=finalAhead.position.z-4.6;
  }
  o.position.z=nextZ;
  if(u.oncoming&&o.position.z>13){o.position.z=-165-Math.random()*70;u.lane=lanes[Math.floor(Math.random()*lanes.length)];u.homeLane=u.lane;u.targetLane=u.lane;u.overtaking=false;u.passTarget=null;o.position.x=u.lane}

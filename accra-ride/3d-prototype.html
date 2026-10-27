@@ -11,6 +11,9 @@
 <script>
 (()=> {
 const $=id=>document.getElementById(id);
+// Keep the start control responsive even if Three.js or scene setup fails before the game handler is installed.
+window.__accraRideStartReady=false;
+$('start').addEventListener('click',ev=>{if(window.__accraRideStartReady)return;ev.preventDefault();$('start').disabled=false;$('start').textContent='RELOAD GAME';$('mission').textContent=window.THREE?'Game setup did not finish loading.':'3D engine failed to load. Check your connection, then reload.';$('note').textContent='Tap RELOAD GAME to try again.';$('start').onclick=()=>location.reload();});
 const PACE_MAX=105, PACE_EXP=1.0;
 const vehicleSpecs={economy:{name:'Economy Car',maxForwardKmh:180,maxReverseKmh:100}};
 const playerVehicle=vehicleSpecs.economy;
@@ -137,7 +140,7 @@ const cm=cameraModes[cameraMode];camera.position.x+=(player.position.x+cm.x-came
 $('speed').textContent=Math.round(Math.abs(speed));$('mission').textContent=(reverse?'REVERSE GEAR':'DRIVE')+' · '+(junctionDistance<34?(lightPhase===0?'RED LIGHT AHEAD':lightPhase===1?'AMBER LIGHT':'GREEN LIGHT'):(lightPhase===0?'RED LIGHT':lightPhase===1?'AMBER LIGHT':'GREEN LIGHT'))+' · '+Math.round(driveDistance)+' m';
 }
 let runtimeFault=false;function animate(now){requestAnimationFrame(animate);const elapsed=(now-last)/1000;const dt=Math.min(.033,Math.max(.001,elapsed||.016));last=now;try{if(active&&!runtimeFault)update(dt);renderer.render(scene,camera)}catch(err){runtimeFault=true;active=false;$('startcover').style.display='grid';$('start').disabled=false;$('start').textContent='RETRY DRIVE';$('mission').textContent='Game error: '+(err&&err.message?err.message:'unknown error');$('note').textContent='Please reload if retry does not work.';console.error('AccraRide runtime failure',err)}}requestAnimationFrame(animate);
-$('start').addEventListener('click',ev=>{ev.preventDefault();if(runtimeFault)runtimeFault=false;$('start').disabled=true;$('start').textContent='STARTING…';$('note').textContent='Loading the road…';try{reset();active=true;$('startcover').style.display='none';try{startAudio()}catch(audioError){console.warn('Audio unavailable; continuing without sound',audioError)} }catch(err){active=false;$('startcover').style.display='grid';$('start').disabled=false;$('start').textContent='RETRY DRIVE';$('mission').textContent='Start error: '+(err&&err.message?err.message:'unknown error');$('note').textContent='Tap retry or reload the page.';console.error('AccraRide start failed',err)} });
+window.__accraRideStartReady=true;$('start').addEventListener('click',ev=>{ev.preventDefault();if(runtimeFault)runtimeFault=false;$('start').disabled=true;$('start').textContent='STARTING…';$('note').textContent='Loading the road…';try{reset();active=true;$('startcover').style.display='none';try{startAudio()}catch(audioError){console.warn('Audio unavailable; continuing without sound',audioError)} }catch(err){active=false;$('startcover').style.display='grid';$('start').disabled=false;$('start').textContent='RETRY DRIVE';$('mission').textContent='Start error: '+(err&&err.message?err.message:'unknown error');$('note').textContent='Tap retry or reload the page.';console.error('AccraRide start failed',err)} });
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.fov=innerWidth>innerHeight?72:66;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.7))});
 })();
 </script></body></html>

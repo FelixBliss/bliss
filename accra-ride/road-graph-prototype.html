@@ -142,8 +142,15 @@ function collide(previousPlayer){
   if(sweptRoadCollision(previousPlayer,currentPlayer,previous,current)){
    // Roll both vehicles back to their last non-overlapping frame. Keep physical
    // resolution active even during the message cooldown, otherwise vehicles ghost through.
-   progress=previousPlayer.progress;lateral=previousPlayer.lateral;
-   player.position.set(previousPlayer.x,.03,previousPlayer.z);playerHeading=previousPlayer.heading;player.rotation.y=playerHeading;
+   progress=previousPlayer.progress;
+   // Keep steering input accumulated during contact and create a small lateral
+   // escape step. Without this, rolling back to the exact same position and
+   // restoring the previous heading traps the player against the vehicle.
+   const escapeStep=steer!==0?steer*0.72:0;
+   lateral=THREE.MathUtils.clamp(previousPlayer.lateral+escapeStep,-6.25,6.25);
+   const rollbackPoint=pointAt(progress,lateral,.03);
+   player.position.set(rollbackPoint.x,.03,rollbackPoint.z);
+   player.rotation.y=playerHeading;
    v.t=v.previousT;v.lane=v.previousLane;
    // Always resolve overlap, but apply impact slowdown only once per cooldown.
    // Otherwise repeated contact frames multiply speed by .22 until the car is effectively stopped.

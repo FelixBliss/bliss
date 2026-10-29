@@ -74,6 +74,8 @@ const roadLength=roadCurve.getLength();
 const samples=240,halfRoad=8.4,halfMedian=.55;
 function sideAt(t){const tangent=roadCurve.getTangentAt(THREE.MathUtils.clamp(t,0,1)).normalize();return new THREE.Vector3(-tangent.z,0,tangent.x).normalize();}
 function pointAt(t,lateral=0,y=.02){const p=roadCurve.getPointAt(THREE.MathUtils.clamp(t,0,1));return p.addScaledVector(sideAt(t),lateral).setY(y);}
+function roadLocalAt(x,z){let bestT=.025,bestD=Infinity;for(let i=0;i<=320;i++){const t=.025+(.95*i/320),p=roadCurve.getPointAt(t),dx=x-p.x,dz=z-p.z,d=dx*dx+dz*dz;if(d<bestD){bestD=d;bestT=t;}}const p=roadCurve.getPointAt(bestT),s=sideAt(bestT);return {progress:bestT,lateral:(x-p.x)*s.x+(z-p.z)*s.z};}
+function headingAt(t){const tan=roadCurve.getTangentAt(THREE.MathUtils.clamp(t,0,1)).normalize();return Math.atan2(-tan.x,-tan.z);}
 function ribbon(name,offset,width,material,y=.01){
  const positions=[],indices=[];for(let i=0;i<=samples;i++){const t=i/samples,p=pointAt(t,offset-width/2,y),q=pointAt(t,offset+width/2,y);positions.push(p.x,p.y,p.z,q.x,q.y,q.z);if(i<samples){const a=i*2,b=a+1,c=a+2,d=a+3;indices.push(a,b,c,b,d,c);}}
  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.setIndex(indices);g.computeVertexNormals();const mesh=new THREE.Mesh(g,material);mesh.name=name;world.add(mesh);return mesh;
@@ -96,15 +98,15 @@ const traffic=[];const carColors=[0xc94c42,0x287bb5,0xe7e5da,0x3e4a53,0xe5a14b,0
 function addTraffic(t,lane,oncoming=false){const car=makeCar(carColors[Math.floor(Math.random()*carColors.length)]);world.add(car);traffic.push({mesh:car,t,lane,homeLane:lane,oncoming,speed:oncoming?17+Math.random()*7:11+Math.random()*9,change:0,hitCooldown:0});}
 for(let i=0;i<7;i++){addTraffic(.23+i*.095,[2.8,5.7][i%2],false);addTraffic(.91-i*.105,[-2.8,-5.7][i%2],true);}
 const buildings=[];for(let i=0;i<42;i++){const t=(i%21)/20;const side=i<21?-1:1;const p=pointAt(t,side*(13+Math.random()*12),0);const h=4+Math.random()*18,w=3+Math.random()*7,d=4+Math.random()*8;const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat([0xbab2a3,0xd2c4a9,0x8d9ba1,0xc2a58b][i%4]));b.position.set(p.x, h/2-.15,p.z);const tangent=roadCurve.getTangentAt(t);b.rotation.y=Math.atan2(-tangent.x,-tangent.z)+(Math.random()-.5)*.3;world.add(b);buildings.push(b);}
-let active=false,gas=false,braking=false,steer=0,speed=0,lateral=2.8,progress=.105,last=performance.now(),collisionCount=0,driveDirection=1,headingOffset=0;
+let active=false,gas=false,braking=false,steer=0,speed=0,lateral=2.8,progress=.105,last=performance.now(),collisionCount=0,driveDirection=1,headingOffset=0,playerHeading=0;
 const maxSpeed=42;
 function setCheck(id,text){$(id).textContent='✓ '+text;}
 setCheck('checkCurve','Road curve rendered');
 function orientOnCurve(mesh,t,offset,extraHeading=0){const p=pointAt(t,offset,.03);const tan=roadCurve.getTangentAt(THREE.MathUtils.clamp(t,0,1)).normalize();mesh.position.copy(p);mesh.rotation.y=Math.atan2(-tan.x,-tan.z)+extraHeading;return p;}
 function reset(){
- speed=0;lateral=2.8;progress=.105;gas=false;braking=false;steer=0;headingOffset=0;collisionCount=0;driveDirection=1;
+ speed=0;lateral=2.8;progress=.105;gas=false;braking=false;steer=0;headingOffset=0;collisionCount=0;driveDirection=1;playerHeading=headingAt(progress);
  traffic.forEach((v,i)=>{v.t = v.oncoming ? 0.91 - (i%7)*0.105 : 0.23 + (i%7)*0.095;v.lane=v.homeLane;v.speed=v.oncoming?17+Math.random()*7:11+Math.random()*9;v.hitCooldown=0;});
- orientOnCurve(player,progress,lateral,headingOffset);$('speed').textContent='0';$('progress').textContent='11%';$('mission').textContent='Reset complete · Follow the bend';setCheck('checkReset','Reset restores test');showToast('Test reset');
+ const spawn=pointAt(progress,lateral,.03);player.position.copy(spawn);playerHeading=headingAt(progress);player.rotation.y=playerHeading;$('speed').textContent='0';$('progress').textContent='11%';$('mission').textContent='Reset complete · Follow the bend';setCheck('checkReset','Reset restores test');showToast('Test reset');
 }
 function showToast(s){$('toast').textContent=s;$('toast').style.opacity=1;clearTimeout(showToast.timer);showToast.timer=setTimeout(()=>$('toast').style.opacity=0,1200);}
 // Swept collision in road-local coordinates. progress/t are arc-length fractions,
@@ -138,9 +140,9 @@ function collide(previousPlayer){
    // Roll both vehicles back to their last non-overlapping frame. Keep physical
    // resolution active even during the message cooldown, otherwise vehicles ghost through.
    progress=previousPlayer.progress;lateral=previousPlayer.lateral;
+   player.position.set(previousPlayer.x,.03,previousPlayer.z);playerHeading=previousPlayer.heading;player.rotation.y=playerHeading;
    v.t=v.previousT;v.lane=v.previousLane;
    speed*=.22;v.speed=Math.max(0,v.speed*.45);
-   orientOnCurve(player,progress,lateral,headingOffset);
    orientOnCurve(v.mesh,v.t,v.lane);
    if(v.hitCooldown<=0){
     collisionCount++;v.hitCooldown=1.1;
@@ -170,19 +172,21 @@ function collide(previousPlayer){
  }
 }
 function update(dt){
- const previousPlayer={progress,lateral};
+ const previousPlayer={progress,lateral,x:player.position.x,z:player.position.z,heading:playerHeading};
  const accel=gas?1:0,brake=braking?1:0;
  if(accel)speed=Math.min(maxSpeed,speed+dt*13);else speed=Math.max(0,speed-dt*1.2);
  if(brake)speed=Math.max(0,speed-dt*25);
- lateral+=steer*dt*(2.8+speed*.055);
- lateral=THREE.MathUtils.clamp(lateral,-6.5,6.5);
- // Keep the car following the road tangent, while steering adds a visible,
- // smooth body-yaw response instead of moving sideways with a rigid heading.
- if(steer!==0)headingOffset=THREE.MathUtils.clamp(headingOffset+steer*dt*(.9+speed*.008),-.38,.38);
- else headingOffset=THREE.MathUtils.damp(headingOffset,0,2.8,dt);
- progress+=driveDirection*(speed/3.6)*dt/roadLength;
- progress=THREE.MathUtils.clamp(progress,.025,.975);
- orientOnCurve(player,progress,lateral,headingOffset);
+ // Steering changes the car's own heading. The car travels along that heading
+ // in world space; it is NOT advanced along the road curve automatically.
+ if(steer!==0){const turnRate=0.42+Math.min(speed/3.6,18)*0.025;playerHeading-=steer*turnRate*dt*(driveDirection<0?-1:1);}
+ const metresPerSecond=(speed/3.6)*driveDirection;
+ player.position.x+=-Math.sin(playerHeading)*metresPerSecond*dt;
+ player.position.z+=-Math.cos(playerHeading)*metresPerSecond*dt;
+ player.position.y=.03;player.rotation.y=playerHeading;
+ const roadPos=roadLocalAt(player.position.x,player.position.z);progress=roadPos.progress;lateral=roadPos.lateral;
+ // Asphalt edge is a hard boundary in this test: stop at the edge rather than
+ // letting the player drift through the shoulder. Steering is needed to follow bends.
+ if(Math.abs(lateral)>7.18){lateral=Math.sign(lateral)*7.18;const edge=pointAt(progress,lateral,.03);player.position.x=edge.x;player.position.z=edge.z;speed=0;$('mission').textContent='Road edge reached · steer to follow the bend';showToast('Road boundary reached');}
  for(const v of traffic){
   v.hitCooldown=Math.max(0,v.hitCooldown-dt);
   v.previousT=v.t;
@@ -205,10 +209,10 @@ function update(dt){
  $('progress').textContent=Math.round(progress*100)+'%';
  if(progress>.45&&progress<.8)$('mission').textContent='Bend active · Traffic stays on road';
  if(progress>=.97){speed=0;$('mission').textContent='End of test segment · RESET to repeat';}
- const tan=roadCurve.getTangentAt(progress).normalize();const p=player.position;
- const desiredCam=p.clone().addScaledVector(tan,-11);desiredCam.y+=5.4;
+ const forward=new THREE.Vector3(-Math.sin(playerHeading),0,-Math.cos(playerHeading));const p=player.position;
+ const desiredCam=p.clone().addScaledVector(forward,-11);desiredCam.y+=5.4;
  camera.position.lerp(desiredCam,Math.min(1,dt*4.2));
- const look=p.clone().addScaledVector(tan,11);look.y+=1.0;camera.lookAt(look);
+ const look=p.clone().addScaledVector(forward,11);look.y+=1.0;camera.lookAt(look);
 }
 function frame(now){requestAnimationFrame(frame);const dt=Math.min(.035,Math.max(.001,(now-last)/1000));last=now;if(active)update(dt);renderer.render(scene,camera);}
 requestAnimationFrame(frame);

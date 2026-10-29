@@ -38,6 +38,7 @@ button.steer{height:58px;min-width:58px;font-size:20px}
   <div class="chip brand">ACCRARIDE<small>CURVED-ROAD MECHANICS TEST</small></div>
   <div class="chip">SPEED<b><span id="speed">0</span> km/h</b></div>
   <div class="chip">ROAD PROGRESS<b id="progress">12%</b></div>
+  <div class="chip">HEADING / ROAD<b id="headingDiag">0° / 0°</b></div>
 </div>
 <div id="mission">Follow the bend · Stay on the road · Traffic follows the same curve</div>
 <div id="checks"><b>TEST CHECKS</b><div id="checkCurve">○ Road curve rendered</div><div id="checkPlayer">○ Steering follows curve</div><div id="checkTraffic">○ AI follows curve</div><div id="checkCollision">○ Collision response</div><div id="checkReset">○ Reset restores test</div></div>
@@ -94,6 +95,8 @@ function makeCar(color,bike=false){
  return g;
 }
 const player=makeCar(0xf1bd36);world.add(player);
+// Bright roof arrow makes the car nose direction unmistakable during steering tests.
+const noseMarker=new THREE.Mesh(new THREE.ConeGeometry(.27,.72,3),mat(0x00f0ff,.3,.1));noseMarker.rotation.x=-Math.PI/2;noseMarker.position.set(0,1.28,-.72);player.add(noseMarker);
 const traffic=[];const carColors=[0xc94c42,0x287bb5,0xe7e5da,0x3e4a53,0xe5a14b,0x4c9865];
 function addTraffic(t,lane,oncoming=false){const car=makeCar(carColors[Math.floor(Math.random()*carColors.length)]);world.add(car);traffic.push({mesh:car,t,lane,homeLane:lane,oncoming,speed:oncoming?17+Math.random()*7:11+Math.random()*9,change:0,hitCooldown:0});}
 for(let i=0;i<7;i++){addTraffic(.23+i*.095,[2.8,5.7][i%2],false);addTraffic(.91-i*.105,[-2.8,-5.7][i%2],true);}
@@ -207,6 +210,8 @@ function update(dt){
  collide(previousPlayer);
  $('speed').textContent=Math.round(speed*3.6);
  $('progress').textContent=Math.round(progress*100)+'%';
+ const roadHeading=headingAt(progress);const angleDeg=r=>Math.round(THREE.MathUtils.euclideanModulo(r+Math.PI,Math.PI*2)*180/Math.PI-180);
+ $('headingDiag').textContent=angleDeg(playerHeading)+'° / '+angleDeg(roadHeading)+'°';
  if(progress>.45&&progress<.8)$('mission').textContent='Bend active · Traffic stays on road';
  if(progress>=.97){speed=0;$('mission').textContent='End of test segment · RESET to repeat';}
  const forward=new THREE.Vector3(-Math.sin(playerHeading),0,-Math.cos(playerHeading));const p=player.position;

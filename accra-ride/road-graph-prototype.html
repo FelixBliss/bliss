@@ -182,7 +182,7 @@ function update(dt){
  else headingOffset=THREE.MathUtils.damp(headingOffset,0,2.8,dt);
  progress+=driveDirection*(speed/3.6)*dt/roadLength;
  progress=THREE.MathUtils.clamp(progress,.025,.975);
- orientOnCurve(player,progress,lateral);
+ orientOnCurve(player,progress,lateral,headingOffset);
  for(const v of traffic){
   v.hitCooldown=Math.max(0,v.hitCooldown-dt);
   v.previousT=v.t;

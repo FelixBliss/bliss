@@ -75,14 +75,14 @@ const samples=240,halfRoad=8.4,halfMedian=.55;
 function sideAt(t){const tangent=roadCurve.getTangentAt(THREE.MathUtils.clamp(t,0,1)).normalize();return new THREE.Vector3(-tangent.z,0,tangent.x).normalize();}
 function pointAt(t,lateral=0,y=.02){const p=roadCurve.getPointAt(THREE.MathUtils.clamp(t,0,1));return p.addScaledVector(sideAt(t),lateral).setY(y);}
 function ribbon(name,offset,width,material,y=.01){
- const positions=[],indices=[];for(let i=0;i<=samples;i++){const t=i/samples,p=pointAt(t,offset-width/2,y),q=pointAt(t,offset+width/2,y);positions.push(p.x,p.y,p.z,q.x,q.y,q.z);if(i<samples){const a=i*2,b=a+1,c=a+2,d=a+3;indices.push(a,c,b,b,c,d);}}
+ const positions=[],indices=[];for(let i=0;i<=samples;i++){const t=i/samples,p=pointAt(t,offset-width/2,y),q=pointAt(t,offset+width/2,y);positions.push(p.x,p.y,p.z,q.x,q.y,q.z);if(i<samples){const a=i*2,b=a+1,c=a+2,d=a+3;indices.push(a,b,c,b,d,c);}}
  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.setIndex(indices);g.computeVertexNormals();const mesh=new THREE.Mesh(g,material);mesh.name=name;world.add(mesh);return mesh;
 }
 const ground=new THREE.Mesh(new THREE.PlaneGeometry(700,500),grass);ground.rotation.x=-Math.PI/2;ground.position.set(0,-.28,-35);world.add(ground);
 ribbon('asphalt-road',0,halfRoad*2,asphalt,0);
 ribbon('left-edge',halfRoad-.16,.12,line,.035);ribbon('right-edge',-halfRoad+.16,.12,line,.035);
 ribbon('median',0,halfMedian,yellow,.045);
-ribbon('lane-line-left',2.8,.09,line,.04);ribbon('lane-line-right',-2.8,.09,line,.04);
+ribbon('lane-line-left',4.25,.09,line,.04);ribbon('lane-line-right',-4.25,.09,line,.04);
 for(let t=.04;t<.98;t+=.035){const p=pointAt(t,0,.07);const marker=new THREE.Mesh(new THREE.BoxGeometry(.16,.035,1.4),yellow);marker.position.copy(p);const tan=roadCurve.getTangentAt(t);marker.rotation.y=Math.atan2(-tan.x,-tan.z);world.add(marker);}
 function makeCar(color,bike=false){
  const g=new THREE.Group();const body=new THREE.Mesh(new THREE.BoxGeometry(bike?.72:1.7,bike?.65:.72,bike?1.5:3.3),mat(color,.48,.08));body.position.y=bike?.58:.62;g.add(body);

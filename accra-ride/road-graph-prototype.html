@@ -145,13 +145,16 @@ function collide(previousPlayer){
    progress=previousPlayer.progress;lateral=previousPlayer.lateral;
    player.position.set(previousPlayer.x,.03,previousPlayer.z);playerHeading=previousPlayer.heading;player.rotation.y=playerHeading;
    v.t=v.previousT;v.lane=v.previousLane;
-   speed*=.22;v.speed=Math.max(0,v.speed*.45);
+   // Always resolve overlap, but apply impact slowdown only once per cooldown.
+   // Otherwise repeated contact frames multiply speed by .22 until the car is effectively stopped.
    orientOnCurve(v.mesh,v.t,v.lane);
    if(v.hitCooldown<=0){
+    speed*=.55;
+    v.speed=Math.max(0,v.speed*.7);
     collisionCount++;v.hitCooldown=1.1;
     setCheck('checkCollision','Collision response');
-    $('mission').textContent='Collision blocked · vehicle stopped';
-    showToast('Impact blocked — speed reduced');
+    $('mission').textContent='Collision blocked · steer around the vehicle';
+    showToast('Impact blocked — steer to clear');
    }
   }
  }

@@ -107,11 +107,65 @@ function reset(){
  orientOnCurve(player,progress,lateral);$('speed').textContent='0';$('progress').textContent='11%';$('mission').textContent='Reset complete · Follow the bend';setCheck('checkReset','Reset restores test');showToast('Test reset');
 }
 function showToast(s){$('toast').textContent=s;$('toast').style.opacity=1;clearTimeout(showToast.timer);showToast.timer=setTimeout(()=>$('toast').style.opacity=0,1200);}
-function collide(){
- const pp=pointAt(progress,lateral,.5);
- for(const v of traffic){if(v.hitCooldown>0)continue;const vp=pointAt(v.t,v.lane,.5);const dz=Math.hypot(pp.x-vp.x,pp.z-vp.z);if(dz<2.65){speed*=.48;v.speed=Math.max(4,v.speed*.8);v.hitCooldown=1.1;collisionCount++;setCheck('checkCollision','Collision response');$('mission').textContent='Collision detected · speed reduced';showToast('Impact detected — speed reduced');}}
+// Swept collision in road-local coordinates. progress/t are arc-length fractions,
+ // while lateral/lane are offsets from the curve centreline. This avoids relying on
+ // world X/Z boxes, which fail when vehicles rotate around a bend.
+function sweptRoadCollision(a0,a1,b0,b1,halfWidth=1.9,halfLength=3.5){
+ const x0=a0.lateral-b0.lateral;
+ const x1=a1.lateral-b1.lateral;
+ const z0=(a0.progress-b0.progress)*roadLength;
+ const z1=(a1.progress-b1.progress)*roadLength;
+ const dx=x1-x0,dz=z1-z0;
+ let enter=0,exit=1;
+ for(const [start,delta,limit] of [[x0,dx,halfWidth],[z0,dz,halfLength]]){
+  if(Math.abs(delta)<1e-7){if(Math.abs(start)>limit)return false;}
+  else{
+   const t1=(-limit-start)/delta,t2=(limit-start)/delta;
+   enter=Math.max(enter,Math.min(t1,t2));
+   exit=Math.min(exit,Math.max(t1,t2));
+   if(enter>exit)return false;
+  }
+ }
+ return exit>=0&&enter<=1;
+}
+function collide(previousPlayer){
+ const currentPlayer={progress,lateral};
+ for(const v of traffic){
+  if(v.hitCooldown>0||v.teleportedThisFrame)continue;
+  const previous={progress:v.previousT,lateral:v.previousLane};
+  const current={progress:v.t,lateral:v.lane};
+  if(sweptRoadCollision(previousPlayer,currentPlayer,previous,current)){
+   speed*=.48;
+   v.speed=Math.max(4,v.speed*.72);
+   v.hitCooldown=1.1;
+   collisionCount++;
+   setCheck('checkCollision','Collision response');
+   $('mission').textContent='Collision detected · speed reduced';
+   showToast('Impact detected — speed reduced');
+  }
+ }
+ // Check AI vehicles against one another too, so traffic cannot ghost through traffic.
+ for(let i=0;i<traffic.length;i++){
+  const a=traffic[i];
+  if(a.hitCooldown>0||a.teleportedThisFrame)continue;
+  for(let j=i+1;j<traffic.length;j++){
+   const b=traffic[j];
+   if(b.hitCooldown>0||b.teleportedThisFrame)continue;
+   if(sweptRoadCollision(
+    {progress:a.previousT,lateral:a.previousLane},
+    {progress:a.t,lateral:a.lane},
+    {progress:b.previousT,lateral:b.previousLane},
+    {progress:b.t,lateral:b.lane}
+   )){
+    a.speed=Math.max(4,a.speed*.78);
+    b.speed=Math.max(4,b.speed*.78);
+    a.hitCooldown=b.hitCooldown=1.1;
+   }
+  }
+ }
 }
 function update(dt){
+ const previousPlayer={progress,lateral};
  const accel=gas?1:0,brake=braking?1:0;
  if(accel)speed=Math.min(maxSpeed,speed+dt*13);else speed=Math.max(0,speed-dt*1.2);
  if(brake)speed=Math.max(0,speed-dt*25);
@@ -122,19 +176,22 @@ function update(dt){
  orientOnCurve(player,progress,lateral);
  for(const v of traffic){
   v.hitCooldown=Math.max(0,v.hitCooldown-dt);
+  v.previousT=v.t;
+  v.previousLane=v.lane;
+  v.teleportedThisFrame=false;
   let desired=v.homeLane;
   if(!v.oncoming){
    for(const other of traffic){if(other===v||other.oncoming)continue;if(Math.abs(other.t-v.t)<.055&&Math.abs(other.lane-v.lane)<1.3){desired=v.homeLane===2.8?5.7:2.8;break;}}
    v.lane+=THREE.MathUtils.clamp(desired-v.lane,-dt*2.5,dt*2.5);
    v.t+=v.speed*dt/roadLength;
   }else v.t-=v.speed*dt/roadLength;
-  if(v.t>.985){v.t=.12+Math.random()*.08;v.lane=v.homeLane;}
-  if(v.t<.02){v.t=.9+Math.random()*.06;v.lane=v.homeLane;}
+  if(v.t>.985){v.t=.12+Math.random()*.08;v.lane=v.homeLane;v.teleportedThisFrame=true;}
+  if(v.t<.02){v.t=.9+Math.random()*.06;v.lane=v.homeLane;v.teleportedThisFrame=true;}
   orientOnCurve(v.mesh,v.t,v.lane);
  }
  if(Math.abs(steer)>.01)setCheck('checkPlayer','Steering follows curve');
  if(traffic.some(v=>Math.abs(roadCurve.getTangentAt(v.t).x)>.12))setCheck('checkTraffic','AI follows curve');
- collide();
+ collide(previousPlayer);
  $('speed').textContent=Math.round(speed*3.6);
  $('progress').textContent=Math.round(progress*100)+'%';
  if(progress>.45&&progress<.8)$('mission').textContent='Bend active · Traffic stays on road';

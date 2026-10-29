@@ -85,8 +85,8 @@ ribbon('median',0,halfMedian,yellow,.045);
 ribbon('lane-line-left',4.25,.09,line,.04);ribbon('lane-line-right',-4.25,.09,line,.04);
 for(let t=.04;t<.98;t+=.035){const p=pointAt(t,0,.07);const marker=new THREE.Mesh(new THREE.BoxGeometry(.16,.035,1.4),yellow);marker.position.copy(p);const tan=roadCurve.getTangentAt(t);marker.rotation.y=Math.atan2(-tan.x,-tan.z);world.add(marker);}
 function makeCar(color,bike=false){
- const g=new THREE.Group();const body=new THREE.Mesh(new THREE.BoxGeometry(bike?.72:1.7,bike?.65:.72,bike?1.5:3.3),mat(color,.48,.08));body.position.y=bike?.58:.62;g.add(body);
- const cabin=new THREE.Mesh(new THREE.BoxGeometry(bike?.45:1.28,bike?.42:.55,bike? .55:1.45),glass);cabin.position.set(0,bike?.94:1.14,-.12);g.add(cabin);
+ const g=new THREE.Group();const body=new THREE.Mesh(new THREE.BoxGeometry(bike ? 0.72 : 1.7,bike ? 0.65 : 0.72,bike ? 1.5 : 3.3),mat(color,.48,.08));body.position.y=bike ? 0.58 : 0.62;g.add(body);
+ const cabin=new THREE.Mesh(new THREE.BoxGeometry(bike ? 0.45 : 1.28,bike ? 0.42 : 0.55,bike ? 0.55 : 1.45),glass);cabin.position.set(0,bike ? 0.94 : 1.14,-0.12);g.add(cabin);
  for(const z of [-.98,.98])for(const x of [-.76,.76]){if(bike)continue;const w=new THREE.Mesh(new THREE.BoxGeometry(.16,.42,.62),dark);w.position.set(x,.35,z);g.add(w);}
  const lamps=[];for(const x of [-.48,.48]){const l=new THREE.Mesh(new THREE.BoxGeometry(.28,.12,.06),mat(0xfff1c5,.25));l.position.set(x,.7,-1.68);g.add(l);lamps.push(l);}
  return g;
@@ -103,7 +103,7 @@ setCheck('checkCurve','Road curve rendered');
 function orientOnCurve(mesh,t,offset){const p=pointAt(t,offset,.03);const tan=roadCurve.getTangentAt(THREE.MathUtils.clamp(t,0,1)).normalize();mesh.position.copy(p);mesh.rotation.y=Math.atan2(-tan.x,-tan.z);return p;}
 function reset(){
  speed=0;lateral=2.8;progress=.105;gas=false;braking=false;steer=0;collisionCount=0;driveDirection=1;
- traffic.forEach((v,i)=>{v.t=v.oncoming?.91-(i%7)*.105:.23+(i%7)*.095;v.lane=v.homeLane;v.speed=v.oncoming?17+Math.random()*7:11+Math.random()*9;v.hitCooldown=0;});
+ traffic.forEach((v,i)=>{v.t = v.oncoming ? 0.91 - (i%7)*0.105 : 0.23 + (i%7)*0.095;v.lane=v.homeLane;v.speed=v.oncoming?17+Math.random()*7:11+Math.random()*9;v.hitCooldown=0;});
  orientOnCurve(player,progress,lateral);$('speed').textContent='0';$('progress').textContent='11%';$('mission').textContent='Reset complete · Follow the bend';setCheck('checkReset','Reset restores test');showToast('Test reset');
 }
 function showToast(s){$('toast').textContent=s;$('toast').style.opacity=1;clearTimeout(showToast.timer);showToast.timer=setTimeout(()=>$('toast').style.opacity=0,1200);}

@@ -96,15 +96,15 @@ const traffic=[];const carColors=[0xc94c42,0x287bb5,0xe7e5da,0x3e4a53,0xe5a14b,0
 function addTraffic(t,lane,oncoming=false){const car=makeCar(carColors[Math.floor(Math.random()*carColors.length)]);world.add(car);traffic.push({mesh:car,t,lane,homeLane:lane,oncoming,speed:oncoming?17+Math.random()*7:11+Math.random()*9,change:0,hitCooldown:0});}
 for(let i=0;i<7;i++){addTraffic(.23+i*.095,[2.8,5.7][i%2],false);addTraffic(.91-i*.105,[-2.8,-5.7][i%2],true);}
 const buildings=[];for(let i=0;i<42;i++){const t=(i%21)/20;const side=i<21?-1:1;const p=pointAt(t,side*(13+Math.random()*12),0);const h=4+Math.random()*18,w=3+Math.random()*7,d=4+Math.random()*8;const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat([0xbab2a3,0xd2c4a9,0x8d9ba1,0xc2a58b][i%4]));b.position.set(p.x, h/2-.15,p.z);const tangent=roadCurve.getTangentAt(t);b.rotation.y=Math.atan2(-tangent.x,-tangent.z)+(Math.random()-.5)*.3;world.add(b);buildings.push(b);}
-let active=false,gas=false,braking=false,steer=0,speed=0,lateral=2.8,progress=.105,last=performance.now(),collisionCount=0,driveDirection=1;
+let active=false,gas=false,braking=false,steer=0,speed=0,lateral=2.8,progress=.105,last=performance.now(),collisionCount=0,driveDirection=1,headingOffset=0;
 const maxSpeed=42;
 function setCheck(id,text){$(id).textContent='✓ '+text;}
 setCheck('checkCurve','Road curve rendered');
-function orientOnCurve(mesh,t,offset){const p=pointAt(t,offset,.03);const tan=roadCurve.getTangentAt(THREE.MathUtils.clamp(t,0,1)).normalize();mesh.position.copy(p);mesh.rotation.y=Math.atan2(-tan.x,-tan.z);return p;}
+function orientOnCurve(mesh,t,offset,extraHeading=0){const p=pointAt(t,offset,.03);const tan=roadCurve.getTangentAt(THREE.MathUtils.clamp(t,0,1)).normalize();mesh.position.copy(p);mesh.rotation.y=Math.atan2(-tan.x,-tan.z)+extraHeading;return p;}
 function reset(){
- speed=0;lateral=2.8;progress=.105;gas=false;braking=false;steer=0;collisionCount=0;driveDirection=1;
+ speed=0;lateral=2.8;progress=.105;gas=false;braking=false;steer=0;headingOffset=0;collisionCount=0;driveDirection=1;
  traffic.forEach((v,i)=>{v.t = v.oncoming ? 0.91 - (i%7)*0.105 : 0.23 + (i%7)*0.095;v.lane=v.homeLane;v.speed=v.oncoming?17+Math.random()*7:11+Math.random()*9;v.hitCooldown=0;});
- orientOnCurve(player,progress,lateral);$('speed').textContent='0';$('progress').textContent='11%';$('mission').textContent='Reset complete · Follow the bend';setCheck('checkReset','Reset restores test');showToast('Test reset');
+ orientOnCurve(player,progress,lateral,headingOffset);$('speed').textContent='0';$('progress').textContent='11%';$('mission').textContent='Reset complete · Follow the bend';setCheck('checkReset','Reset restores test');showToast('Test reset');
 }
 function showToast(s){$('toast').textContent=s;$('toast').style.opacity=1;clearTimeout(showToast.timer);showToast.timer=setTimeout(()=>$('toast').style.opacity=0,1200);}
 // Swept collision in road-local coordinates. progress/t are arc-length fractions,
@@ -131,35 +131,40 @@ function sweptRoadCollision(a0,a1,b0,b1,halfWidth=1.9,halfLength=3.5){
 function collide(previousPlayer){
  const currentPlayer={progress,lateral};
  for(const v of traffic){
-  if(v.hitCooldown>0||v.teleportedThisFrame)continue;
+  if(v.teleportedThisFrame||!Number.isFinite(v.previousT)||!Number.isFinite(v.previousLane))continue;
   const previous={progress:v.previousT,lateral:v.previousLane};
   const current={progress:v.t,lateral:v.lane};
   if(sweptRoadCollision(previousPlayer,currentPlayer,previous,current)){
-   speed*=.48;
-   v.speed=Math.max(4,v.speed*.72);
-   v.hitCooldown=1.1;
-   collisionCount++;
-   setCheck('checkCollision','Collision response');
-   $('mission').textContent='Collision detected · speed reduced';
-   showToast('Impact detected — speed reduced');
+   // Roll both vehicles back to their last non-overlapping frame. Keep physical
+   // resolution active even during the message cooldown, otherwise vehicles ghost through.
+   progress=previousPlayer.progress;lateral=previousPlayer.lateral;
+   v.t=v.previousT;v.lane=v.previousLane;
+   speed*=.22;v.speed=Math.max(0,v.speed*.45);
+   orientOnCurve(player,progress,lateral,headingOffset);
+   orientOnCurve(v.mesh,v.t,v.lane);
+   if(v.hitCooldown<=0){
+    collisionCount++;v.hitCooldown=1.1;
+    setCheck('checkCollision','Collision response');
+    $('mission').textContent='Collision blocked · vehicle stopped';
+    showToast('Impact blocked — speed reduced');
+   }
   }
  }
- // Check AI vehicles against one another too, so traffic cannot ghost through traffic.
+ // AI-to-AI impacts also roll both cars back, so they cannot pass through each other.
  for(let i=0;i<traffic.length;i++){
-  const a=traffic[i];
-  if(a.hitCooldown>0||a.teleportedThisFrame)continue;
+  const a=traffic[i];if(a.teleportedThisFrame)continue;
   for(let j=i+1;j<traffic.length;j++){
-   const b=traffic[j];
-   if(b.hitCooldown>0||b.teleportedThisFrame)continue;
+   const b=traffic[j];if(b.teleportedThisFrame)continue;
    if(sweptRoadCollision(
     {progress:a.previousT,lateral:a.previousLane},
     {progress:a.t,lateral:a.lane},
     {progress:b.previousT,lateral:b.previousLane},
     {progress:b.t,lateral:b.lane}
    )){
-    a.speed=Math.max(4,a.speed*.78);
-    b.speed=Math.max(4,b.speed*.78);
-    a.hitCooldown=b.hitCooldown=1.1;
+    a.t=a.previousT;a.lane=a.previousLane;b.t=b.previousT;b.lane=b.previousLane;
+    a.speed=Math.max(0,a.speed*.45);b.speed=Math.max(0,b.speed*.45);
+    orientOnCurve(a.mesh,a.t,a.lane);orientOnCurve(b.mesh,b.t,b.lane);
+    if(a.hitCooldown<=0&&b.hitCooldown<=0){a.hitCooldown=b.hitCooldown=1.1;showToast('Traffic collision blocked');}
    }
   }
  }
@@ -171,6 +176,10 @@ function update(dt){
  if(brake)speed=Math.max(0,speed-dt*25);
  lateral+=steer*dt*(2.8+speed*.055);
  lateral=THREE.MathUtils.clamp(lateral,-6.5,6.5);
+ // Keep the car following the road tangent, while steering adds a visible,
+ // smooth body-yaw response instead of moving sideways with a rigid heading.
+ if(steer!==0)headingOffset=THREE.MathUtils.clamp(headingOffset+steer*dt*(.9+speed*.008),-.38,.38);
+ else headingOffset=THREE.MathUtils.damp(headingOffset,0,2.8,dt);
  progress+=driveDirection*(speed/3.6)*dt/roadLength;
  progress=THREE.MathUtils.clamp(progress,.025,.975);
  orientOnCurve(player,progress,lateral);

@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#10283b">
+<title>AccraRide — Curved Road Prototype</title>
+<style>
+*{box-sizing:border-box;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#9bcde1;color:#fff;font-family:system-ui,sans-serif;touch-action:none}
+canvas{display:block;width:100%;height:100%}
+#hud{position:fixed;inset:10px 10px auto;display:flex;justify-content:space-between;gap:8px;pointer-events:none;align-items:flex-start}
+.chip{background:#10283bea;border:1px solid #ffffff25;border-radius:12px;padding:7px 11px;font-size:10px;box-shadow:0 3px 12px #0003}
+.chip b{display:block;font-size:16px}.brand{font-weight:900;letter-spacing:.4px}.brand small{display:block;font-size:9px;color:#c0d1dc;font-weight:500;letter-spacing:0}
+#mission{position:fixed;top:62px;left:50%;transform:translateX(-50%);padding:7px 12px;border-radius:11px;background:#10283bea;border:1px solid #ffffff20;text-align:center;font-size:10px;white-space:nowrap;max-width:90vw}
+#controls{position:fixed;inset:auto 0 max(10px,env(safe-area-inset-bottom));display:flex;align-items:end;justify-content:space-between;padding:0 16px;gap:12px;pointer-events:none}
+.group{display:flex;gap:8px;align-items:end;pointer-events:auto}
+button{border:1px solid #ffffff70;border-radius:12px;background:#10283bed;color:#fff;font-weight:900;font-size:11px;min-width:54px;height:48px;padding:0 12px;touch-action:none}
+button:active,button.down{transform:translateY(2px);filter:brightness(1.2)}
+button.primary{background:#e9b93f;color:#142938;border-color:#f6d66d}
+button.gas{background:#21834b;color:#fff;min-width:68px;height:66px}
+button.brake{background:#b84438;color:#fff;min-width:68px;height:66px}
+button.steer{height:58px;min-width:58px;font-size:20px}
+#toast{position:fixed;left:50%;bottom:112px;transform:translateX(-50%);background:#10283bef;border-radius:12px;padding:8px 12px;font-size:11px;pointer-events:none;opacity:0;transition:opacity .2s}
+#startcover{position:fixed;inset:0;background:linear-gradient(#092236b8,#092236ed);display:grid;place-items:center;padding:18px}
+#startcard{max-width:480px;text-align:center;background:#10283bf2;border:1px solid #ffffff2b;border-radius:22px;padding:22px;box-shadow:0 18px 50px #0005}
+#startcard h1{margin:5px 0 8px;font-size:25px}#startcard p{font-size:12px;line-height:1.5;color:#d2e1e9;margin:8px 0 14px}
+#start{border:0;border-radius:12px;background:#f2bd42;color:#172a37;font-weight:900;padding:13px 22px;font-size:13px}
+#note{font-size:10px;color:#aec3cf;margin-top:12px;line-height:1.4}
+#checks{position:fixed;left:10px;top:112px;max-width:220px;background:#10283bd9;border:1px solid #ffffff22;border-radius:12px;padding:9px 11px;font-size:10px;line-height:1.55;pointer-events:none}
+#checks b{display:block;margin-bottom:3px;color:#f2bd42}
+@media(max-width:700px){.chip{padding:6px 8px;font-size:9px}.chip b{font-size:13px}#controls{padding:0 8px;gap:5px}.group{gap:5px}button{min-width:42px;padding:0 8px;font-size:9px}button.steer{min-width:48px;height:52px}button.gas,button.brake{min-width:54px;height:58px}#checks{max-width:175px;top:105px;font-size:9px}#mission{top:56px;font-size:9px}}
+@media(max-height:470px){#controls{bottom:5px}button{height:38px}button.steer{height:44px}button.gas,button.brake{height:48px}#checks{top:95px}}
+</style>
+</head>
+<body>
+<div id="hud">
+  <div class="chip brand">ACCRARIDE<small>CURVED-ROAD MECHANICS TEST</small></div>
+  <div class="chip">SPEED<b><span id="speed">0</span> km/h</b></div>
+  <div class="chip">ROAD PROGRESS<b id="progress">12%</b></div>
+  <div class="chip">HEADING / ROAD<b id="headingDiag">0° / 0°</b></div>
+</div>
+<div id="mission">Follow the bend · Stay on the road · Traffic follows the same curve</div>
+<div id="checks"><b>TEST CHECKS</b><div id="checkCurve">○ Road curve rendered</div><div id="checkPlayer">○ Steering follows curve</div><div id="checkTraffic">○ AI follows curve</div><div id="checkCollision">○ Collision response</div><div id="checkReset">○ Reset restores test</div></div>
+<div id="controls">
+  <div class="group"><button class="steer" id="left">◀</button><button class="steer" id="right">▶</button><button id="reset">RESET</button></div>
+  <div class="group"><button class="brake" id="brake">BRAKE</button><button class="gas" id="gas">ACCEL</button></div>
+</div>
+<div id="toast"></div>
+<div id="startcover"><div id="startcard"><div style="font-size:36px">↪️</div><h1>AccraRide Curved Road</h1><p>This isolated prototype tests whether the player car, traffic, steering and collision response can follow one curved road. The curve is test geometry only—not yet a surveyed Accra route. The production driving page is unchanged.</p><button id="start" class="primary">START TEST DRIVE</button><div id="note">Landscape recommended · Hold ACCEL · Use ◀ ▶ to steer · Traffic uses the same curve path</div></div></div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>
+(()=> {
+const $=id=>document.getElementById(id);
+if(!window.THREE){$('mission').textContent='3D engine unavailable — check internet connection';return;}
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x9bcde1);
+scene.fog=new THREE.Fog(0x9bcde1,70,230);
+const camera=new THREE.PerspectiveCamera(68,innerWidth/innerHeight,.1,350);
+const renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.35));renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;document.body.prepend(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xd8efff,0x536348,2.2));
+const sun=new THREE.DirectionalLight(0xfff0d1,2.2);sun.position.set(-20,30,25);scene.add(sun);
+const mat=(c,r=.85,m=0)=>new THREE.MeshStandardMaterial({color:c,roughness:r,metalness:m});
+const asphalt=mat(0x343b40),grass=mat(0x6d965d),line=mat(0xf5f0dd),yellow=mat(0xe8bd42),concrete=mat(0xaaa99e),dark=mat(0x20262b),glass=mat(0x8ab9c8,.35,.1);
+const world=new THREE.Group();scene.add(world);
+const roadCurve=new THREE.CatmullRomCurve3([
+ new THREE.Vector3(0,0,85),new THREE.Vector3(0,0,55),new THREE.Vector3(2,0,30),
+ new THREE.Vector3(9,0,5),new THREE.Vector3(17,0,-20),new THREE.Vector3(19,0,-43),
+ new THREE.Vector3(11,0,-66),new THREE.Vector3(-4,0,-87),new THREE.Vector3(-18,0,-111),
+ new THREE.Vector3(-23,0,-137),new THREE.Vector3(-18,0,-161)
+],false,'centripetal',.35);
+roadCurve.arcLengthDivisions=800;
+const roadLength=roadCurve.getLength();
+const samples=240,halfRoad=8.4,halfMedian=.55;
+function sideAt(t){const tangent=roadCurve.getTangentAt(THREE.MathUtils.clamp(t,0,1)).normalize();return new THREE.Vector3(-tangent.z,0,tangent.x).normalize();}
+function pointAt(t,lateral=0,y=.02){const p=roadCurve.getPointAt(THREE.MathUtils.clamp(t,0,1));return p.addScaledVector(sideAt(t),lateral).setY(y);}
+function roadLocalAt(x,z){let bestT=.025,bestD=Infinity;for(let i=0;i<=320;i++){const t=.025+(.95*i/320),p=roadCurve.getPointAt(t),dx=x-p.x,dz=z-p.z,d=dx*dx+dz*dz;if(d<bestD){bestD=d;bestT=t;}}const p=roadCurve.getPointAt(bestT),s=sideAt(bestT);return {progress:bestT,lateral:(x-p.x)*s.x+(z-p.z)*s.z};}
+function headingAt(t){const tan=roadCurve.getTangentAt(THREE.MathUtils.clamp(t,0,1)).normalize();return Math.atan2(-tan.x,-tan.z);}
+function ribbon(name,offset,width,material,y=.01){
+ const positions=[],indices=[];for(let i=0;i<=samples;i++){const t=i/samples,p=pointAt(t,offset-width/2,y),q=pointAt(t,offset+width/2,y);positions.push(p.x,p.y,p.z,q.x,q.y,q.z);if(i<samples){const a=i*2,b=a+1,c=a+2,d=a+3;indices.push(a,b,c,b,d,c);}}
+ const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.setIndex(indices);g.computeVertexNormals();const mesh=new THREE.Mesh(g,material);mesh.name=name;world.add(mesh);return mesh;
+}
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(700,500),grass);ground.rotation.x=-Math.PI/2;ground.position.set(0,-.28,-35);world.add(ground);
+ribbon('asphalt-road',0,halfRoad*2,asphalt,0);
+ribbon('left-edge',halfRoad-.16,.12,line,.035);ribbon('right-edge',-halfRoad+.16,.12,line,.035);
+ribbon('median',0,halfMedian,yellow,.045);
+ribbon('lane-line-left',4.25,.09,line,.04);ribbon('lane-line-right',-4.25,.09,line,.04);
+for(let t=.04;t<.98;t+=.035){const p=pointAt(t,0,.07);const marker=new THREE.Mesh(new THREE.BoxGeometry(.16,.035,1.4),yellow);marker.position.copy(p);const tan=roadCurve.getTangentAt(t);marker.rotation.y=Math.atan2(-tan.x,-tan.z);world.add(marker);}
+function makeCar(color,bike=false){
+ const g=new THREE.Group();const body=new THREE.Mesh(new THREE.BoxGeometry(bike ? 0.72 : 1.7,bike ? 0.65 : 0.72,bike ? 1.5 : 3.3),mat(color,.48,.08));body.position.y=bike ? 0.58 : 0.62;g.add(body);
+ const cabin=new THREE.Mesh(new THREE.BoxGeometry(bike ? 0.45 : 1.28,bike ? 0.42 : 0.55,bike ? 0.55 : 1.45),glass);cabin.position.set(0,bike ? 0.94 : 1.14,-0.12);g.add(cabin);
+ for(const z of [-.98,.98])for(const x of [-.76,.76]){if(bike)continue;const w=new THREE.Mesh(new THREE.BoxGeometry(.16,.42,.62),dark);w.position.set(x,.35,z);g.add(w);}
+ const lamps=[];for(const x of [-.48,.48]){const l=new THREE.Mesh(new THREE.BoxGeometry(.28,.12,.06),mat(0xfff1c5,.25));l.position.set(x,.7,-1.68);g.add(l);lamps.push(l);}
+ return g;
+}
+const player=makeCar(0xf1bd36);world.add(player);
+// Bright roof arrow makes the car nose direction unmistakable during steering tests.
+const noseMarker=new THREE.Mesh(new THREE.ConeGeometry(.27,.72,3),mat(0x00f0ff,.3,.1));noseMarker.rotation.x=-Math.PI/2;noseMarker.position.set(0,1.28,-.72);player.add(noseMarker);
+const traffic=[];const carColors=[0xc94c42,0x287bb5,0xe7e5da,0x3e4a53,0xe5a14b,0x4c9865];
+// Centralized cruise-speed settings: collision response must never rewrite these targets.
+const SPEED_SETTINGS={playerMax:42,aiSameDirectionMin:11,aiSameDirectionMax:20,aiOncomingMin:17,aiOncomingMax:24,aiCollisionRecovery:1.1};
+function randomBetween(min,max){return min+Math.random()*(max-min);}
+function addTraffic(t,lane,oncoming=false){const car=makeCar(carColors[Math.floor(Math.random()*carColors.length)]);world.add(car);const cruiseSpeed=randomBetween(oncoming?SPEED_SETTINGS.aiOncomingMin:SPEED_SETTINGS.aiSameDirectionMin,oncoming?SPEED_SETTINGS.aiOncomingMax:SPEED_SETTINGS.aiSameDirectionMax);traffic.push({mesh:car,t,lane,homeLane:lane,oncoming,cruiseSpeed,speed:cruiseSpeed,speedRecovery:0,change:0,hitCooldown:0});}
+for(let i=0;i<7;i++){addTraffic(.23+i*.095,[2.8,5.7][i%2],false);addTraffic(.91-i*.105,[-2.8,-5.7][i%2],true);}
+const buildings=[];for(let i=0;i<42;i++){const t=(i%21)/20;const side=i<21?-1:1;const p=pointAt(t,side*(13+Math.random()*12),0);const h=4+Math.random()*18,w=3+Math.random()*7,d=4+Math.random()*8;const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat([0xbab2a3,0xd2c4a9,0x8d9ba1,0xc2a58b][i%4]));b.position.set(p.x, h/2-.15,p.z);const tangent=roadCurve.getTangentAt(t);b.rotation.y=Math.atan2(-tangent.x,-tangent.z)+(Math.random()-.5)*.3;world.add(b);buildings.push(b);}
+let active=false,gas=false,braking=false,steer=0,speed=0,lateral=2.8,progress=.105,last=performance.now(),collisionCount=0,collisionRecovery=0,hitLock=0,driveDirection=1,headingOffset=0,playerHeading=0;
+const maxSpeed=SPEED_SETTINGS.playerMax;
+function setCheck(id,text){$(id).textContent='✓ '+text;}
+setCheck('checkCurve','Road curve rendered');
+function orientOnCurve(mesh,t,offset,extraHeading=0){const p=pointAt(t,offset,.03);const tan=roadCurve.getTangentAt(THREE.MathUtils.clamp(t,0,1)).normalize();mesh.position.copy(p);mesh.rotation.y=Math.atan2(-tan.x,-tan.z)+extraHeading;return p;}
+function reset(){
+ speed=0;lateral=2.8;progress=.105;gas=false;braking=false;steer=0;headingOffset=0;collisionCount=0;collisionRecovery=0;hitLock=0;driveDirection=1;playerHeading=headingAt(progress);
+ traffic.forEach((v,i)=>{v.t = v.oncoming ? 0.91 - (i%7)*0.105 : 0.23 + (i%7)*0.095;v.lane=v.homeLane;v.cruiseSpeed=randomBetween(v.oncoming?SPEED_SETTINGS.aiOncomingMin:SPEED_SETTINGS.aiSameDirectionMin,v.oncoming?SPEED_SETTINGS.aiOncomingMax:SPEED_SETTINGS.aiSameDirectionMax);v.speed=v.cruiseSpeed;v.speedRecovery=0;v.hitCooldown=0;});
+ const spawn=pointAt(progress,lateral,.03);player.position.copy(spawn);playerHeading=headingAt(progress);player.rotation.y=playerHeading;$('speed').textContent='0';$('progress').textContent='11%';$('mission').textContent='Reset complete · Follow the bend';setCheck('checkReset','Reset restores test');showToast('Test reset');
+}
+function showToast(s){$('toast').textContent=s;$('toast').style.opacity=1;clearTimeout(showToast.timer);showToast.timer=setTimeout(()=>$('toast').style.opacity=0,1200);}
+// Swept collision in road-local coordinates. progress/t are arc-length fractions,
+ // while lateral/lane are offsets from the curve centreline. This avoids relying on
+ // world X/Z boxes, which fail when vehicles rotate around a bend.
+function sweptRoadCollision(a0,a1,b0,b1,halfWidth=1.9,halfLength=3.5){
+ const x0=a0.lateral-b0.lateral;
+ const x1=a1.lateral-b1.lateral;
+ const z0=(a0.progress-b0.progress)*roadLength;
+ const z1=(a1.progress-b1.progress)*roadLength;
+ const dx=x1-x0,dz=z1-z0;
+ let enter=0,exit=1;
+ for(const [start,delta,limit] of [[x0,dx,halfWidth],[z0,dz,halfLength]]){
+  if(Math.abs(delta)<1e-7){if(Math.abs(start)>limit)return false;}
+  else{
+   const t1=(-limit-start)/delta,t2=(limit-start)/delta;
+   enter=Math.max(enter,Math.min(t1,t2));
+   exit=Math.min(exit,Math.max(t1,t2));
+   if(enter>exit)return false;
+  }
+ }
+ return exit>=0&&enter<=1;
+}
+function collide(previousPlayer){
+ const currentPlayer={progress,lateral};
+ for(const v of traffic){
+  if(v.teleportedThisFrame||!Number.isFinite(v.previousT)||!Number.isFinite(v.previousLane))continue;
+  const previous={progress:v.previousT,lateral:v.previousLane};
+  const current={progress:v.t,lateral:v.lane};
+  if(sweptRoadCollision(previousPlayer,currentPlayer,previous,current)){
+   // Adapt the main AccraRide collision response: keep swept detection, separate
+   // the traffic vehicle along the road, and briefly lock throttle after impact.
+   // Do not snap the independently-steered player back onto the road centreline.
+   const wasAhead=v.previousT>previousPlayer.progress;
+   const separation=3.25/roadLength;
+   v.t=THREE.MathUtils.clamp(progress+(wasAhead?separation:-separation),.025,.975);
+   v.lane=v.previousLane;
+   orientOnCurve(v.mesh,v.t,v.lane);
+   // One global player lock prevents multiple vehicles or repeated contact
+   // frames from stacking the speed penalty during the same impact event.
+   if(hitLock<=0){
+    speed*=.42;
+    collisionRecovery=.7;
+    hitLock=1.3;
+    // Keep the AI's configured cruise speed; the impact only separates vehicles.
+    collisionCount++;v.hitCooldown=1.3;
+    setCheck('checkCollision','Collision response');
+    $('mission').textContent='Impact · steer clear; throttle recovers shortly';
+    showToast('Collision — steer clear');
+   }
+  }
+ }
+ // AI-to-AI swept collisions: separate the pair once, then apply one
+ // cooldown-limited impact penalty. Repeated rollback was multiplying both
+ // speeds every frame and trapping traffic in a permanent collision loop.
+ for(let i=0;i<traffic.length;i++){
+  const a=traffic[i];if(a.teleportedThisFrame)continue;
+  for(let j=i+1;j<traffic.length;j++){
+   const b=traffic[j];if(b.teleportedThisFrame)continue;
+   if(sweptRoadCollision(
+    {progress:a.previousT,lateral:a.previousLane},
+    {progress:a.t,lateral:a.lane},
+    {progress:b.previousT,lateral:b.previousLane},
+    {progress:b.t,lateral:b.lane}
+   )){
+    const gap=6.2/roadLength;
+    const midpoint=(a.t+b.t)*.5;
+    const aWasAhead=a.previousT>=b.previousT;
+    a.t=THREE.MathUtils.clamp(midpoint+(aWasAhead?gap*.5:-gap*.5),.025,.975);
+    b.t=THREE.MathUtils.clamp(midpoint+(aWasAhead?-gap*.5:gap*.5),.025,.975);
+    a.lane=a.previousLane;b.lane=b.previousLane;
+    if(a.hitCooldown<=0&&b.hitCooldown<=0){
+     a.speed=Math.max(7,a.speed*.7);
+     b.speed=Math.max(7,b.speed*.7);
+     a.hitCooldown=b.hitCooldown=1.1;
+     showToast('Traffic collision blocked');
+    }
+    orientOnCurve(a.mesh,a.t,a.lane);orientOnCurve(b.mesh,b.t,b.lane);
+   }
+  }
+ }
+}
+function update(dt){
+ const previousPlayer={progress,lateral,x:player.position.x,z:player.position.z,heading:playerHeading};
+ const accel=gas&&collisionRecovery<=0?1:0,brake=braking?1:0;
+ if(collisionRecovery>0)collisionRecovery=Math.max(0,collisionRecovery-dt);
+ if(hitLock>0)hitLock=Math.max(0,hitLock-dt);
+ if(accel)speed=Math.min(maxSpeed,speed+dt*13);else speed=Math.max(0,speed-dt*1.2);
+ if(brake)speed=Math.max(0,speed-dt*25);
+ // Steering changes the car's own heading. The car travels along that heading
+ // in world space; it is NOT advanced along the road curve automatically.
+ if(steer!==0){const turnRate=0.42+Math.min(speed/3.6,18)*0.025;playerHeading-=steer*turnRate*dt*(driveDirection<0?-1:1);}
+ const metresPerSecond=(speed/3.6)*driveDirection;
+ player.position.x+=-Math.sin(playerHeading)*metresPerSecond*dt;
+ player.position.z+=-Math.cos(playerHeading)*metresPerSecond*dt;
+ player.position.y=.03;player.rotation.y=playerHeading;
+ const roadPos=roadLocalAt(player.position.x,player.position.z);progress=roadPos.progress;lateral=roadPos.lateral;
+ // Asphalt edge is a hard boundary in this test: stop at the edge rather than
+ // letting the player drift through the shoulder. Steering is needed to follow bends.
+ if(Math.abs(lateral)>7.18){lateral=Math.sign(lateral)*7.18;const edge=pointAt(progress,lateral,.03);player.position.x=edge.x;player.position.z=edge.z;speed=0;$('mission').textContent='Road edge reached · steer to follow the bend';showToast('Road boundary reached');}
+ for(const v of traffic){
+  v.hitCooldown=Math.max(0,v.hitCooldown-dt);
+  v.previousT=v.t;
+  v.previousLane=v.lane;
+  v.teleportedThisFrame=false;
+  let desired=v.homeLane;
+  if(!v.oncoming){
+   for(const other of traffic){if(other===v||other.oncoming)continue;if(Math.abs(other.t-v.t)<.055&&Math.abs(other.lane-v.lane)<1.3){desired=v.homeLane===2.8?5.7:2.8;break;}}
+   v.lane+=THREE.MathUtils.clamp(desired-v.lane,-dt*2.5,dt*2.5);
+   v.t+=v.speed*dt/roadLength;
+  }else v.t-=v.speed*dt/roadLength;
+  if(v.t>.985){v.t=.12+Math.random()*.08;v.lane=v.homeLane;v.teleportedThisFrame=true;}
+  if(v.t<.02){v.t=.9+Math.random()*.06;v.lane=v.homeLane;v.teleportedThisFrame=true;}
+  orientOnCurve(v.mesh,v.t,v.lane);
+ }
+ if(Math.abs(steer)>.01)setCheck('checkPlayer','Steering follows curve');
+ if(traffic.some(v=>Math.abs(roadCurve.getTangentAt(v.t).x)>.12))setCheck('checkTraffic','AI follows curve');
+ collide(previousPlayer);
+ $('speed').textContent=Math.round(speed*3.6);
+ $('progress').textContent=Math.round(progress*100)+'%';
+ const roadHeading=headingAt(progress);const angleDeg=r=>Math.round(THREE.MathUtils.euclideanModulo(r+Math.PI,Math.PI*2)*180/Math.PI-180);
+ $('headingDiag').textContent=angleDeg(playerHeading)+'° / '+angleDeg(roadHeading)+'°';
+ if(progress>.45&&progress<.8)$('mission').textContent='Bend active · Traffic stays on road';
+ if(progress>=.97){speed=0;$('mission').textContent='End of test segment · RESET to repeat';}
+ const forward=new THREE.Vector3(-Math.sin(playerHeading),0,-Math.cos(playerHeading));const p=player.position;
+ const desiredCam=p.clone().addScaledVector(forward,-11);desiredCam.y+=5.4;
+ camera.position.lerp(desiredCam,Math.min(1,dt*4.2));
+ const look=p.clone().addScaledVector(forward,11);look.y+=1.0;camera.lookAt(look);
+}
+function frame(now){requestAnimationFrame(frame);const dt=Math.min(.035,Math.max(.001,(now-last)/1000));last=now;if(active)update(dt);renderer.render(scene,camera);}
+requestAnimationFrame(frame);
+function bindHold(id,on,off){const el=$(id);const start=e=>{e.preventDefault();on();el.classList.add('down');};const end=e=>{if(e)e.preventDefault();off();el.classList.remove('down');};el.addEventListener('pointerdown',start);['pointerup','pointercancel','pointerleave'].forEach(ev=>el.addEventListener(ev,end));}
+bindHold('gas',()=>gas=true,()=>gas=false);bindHold('brake',()=>braking=true,()=>braking=false);
+bindHold('left',()=>steer=-1,()=>{if(steer===-1)steer=0;});bindHold('right',()=>steer=1,()=>{if(steer===1)steer=0;});
+$('reset').addEventListener('click',reset);
+function startTestDrive(e){
+  if(e){e.preventDefault();e.stopPropagation();}
+  if(active)return;
+  $('startcover').style.display='none';
+  active=true;
+  reset();
+  showToast('Curved-road test started');
+}
+const startButton=$('start');
+startButton.addEventListener('pointerdown',startTestDrive,{passive:false});
+startButton.addEventListener('click',startTestDrive);
+startButton.addEventListener('touchend',startTestDrive,{passive:false});
+window.addEventListener('keydown',e=>{if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault();if(e.key==='ArrowUp'||e.key==='w'||e.key==='W')gas=true;if(e.key==='ArrowDown'||e.key==='s'||e.key==='S')braking=true;if(e.key==='ArrowLeft'||e.key==='a'||e.key==='A')steer=-1;if(e.key==='ArrowRight'||e.key==='d'||e.key==='D')steer=1;if(e.key==='r'||e.key==='R')reset();});
+window.addEventListener('keyup',e=>{if(e.key==='ArrowUp'||e.key==='w'||e.key==='W')gas=false;if(e.key==='ArrowDown'||e.key==='s'||e.key==='S')braking=false;if(['ArrowLeft','a','A','ArrowRight','d','D'].includes(e.key))steer=0;});
+window.addEventListener('blur',()=>{gas=false;braking=false;steer=0;});
+window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.fov=innerWidth>innerHeight?68:64;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+reset();
+})();
+</script>
+</body>
+</html>

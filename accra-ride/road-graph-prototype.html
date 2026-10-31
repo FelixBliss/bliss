@@ -102,7 +102,7 @@ const traffic=[];const carColors=[0xc94c42,0x287bb5,0xe7e5da,0x3e4a53,0xe5a14b,0
 const KMH_TO_MPS=1/3.6;
 const SPEED_SETTINGS={playerMaxForwardKmh:180,playerMaxReverseKmh:100,aiSameDirectionMinKmh:62,aiSameDirectionMaxKmh:128,aiOncomingMinKmh:72,aiOncomingMaxKmh:115,aiCollisionRecoveryRate:.35};
 function randomBetween(min,max){return min+Math.random()*(max-min);}
-function addTraffic(t,lane,oncoming=false){const car=makeCar(carColors[Math.floor(Math.random()*carColors.length)]);world.add(car);const cruiseSpeed=randomBetween(oncoming?SPEED_SETTINGS.aiOncomingMinKmh:SPEED_SETTINGS.aiSameDirectionMinKmh,oncoming?SPEED_SETTINGS.aiOncomingMaxKmh:SPEED_SETTINGS.aiSameDirectionMaxKmh)*KMH_TO_MPS;traffic.push({mesh:car,t,lane,homeLane:lane,oncoming,cruiseSpeed,speed:cruiseSpeed,speedRecovery:0,change:0,hitCooldown:0});}
+function addTraffic(t,lane,oncoming=false){const car=makeCar(carColors[Math.floor(Math.random()*carColors.length)]);world.add(car);const cruiseSpeed=randomBetween(oncoming?SPEED_SETTINGS.aiOncomingMinKmh:SPEED_SETTINGS.aiSameDirectionMinKmh,oncoming?SPEED_SETTINGS.aiOncomingMaxKmh:SPEED_SETTINGS.aiSameDirectionMaxKmh)*KMH_TO_MPS;traffic.push({mesh:car,t,lane,homeLane:lane,targetLane:lane,oncoming,cruiseSpeed,speed:cruiseSpeed,speedRecovery:0,change:0,laneChangeCooldown:.4+Math.random()*.8,overtaking:false,passTarget:null,hitCooldown:0});}
 for(let i=0;i<7;i++){addTraffic(.23+i*.095,[2.8,5.7][i%2],false);addTraffic(.91-i*.105,[-2.8,-5.7][i%2],true);}
 const buildings=[];for(let i=0;i<42;i++){const t=(i%21)/20;const side=i<21?-1:1;const offset=side*(13+Math.random()*12);const p=pointAt(t,offset,0);const h=4+Math.random()*18,w=3+Math.random()*7,d=4+Math.random()*8;const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat([0xbab2a3,0xd2c4a9,0x8d9ba1,0xc2a58b][i%4]));b.position.set(p.x,h/2-.15,p.z);const tangent=roadCurve.getTangentAt(t);b.rotation.y=Math.atan2(-tangent.x,-tangent.z)+(Math.random()-.5)*.3;world.add(b);buildings.push({mesh:b,offset,t,h,rotationJitter:(Math.random()-.5)*.3});}
 let active=false,gas=false,braking=false,steer=0,speed=0,lateral=2.8,progress=.105,last=performance.now(),collisionCount=0,collisionRecovery=0,hitLock=0,driveDirection=1,headingOffset=0,playerHeading=0,throttleResponse=0;
@@ -115,7 +115,7 @@ setCheck('checkCurve','Road curve rendered');
 function orientOnCurve(mesh,t,offset,extraHeading=0){const p=pointAt(t,offset,.03);const tan=roadCurve.getTangentAt(THREE.MathUtils.clamp(t,0,1)).normalize();mesh.position.copy(p);mesh.rotation.y=Math.atan2(-tan.x,-tan.z)+extraHeading;return p;}
 function reset(){
  speed=0;lateral=2.8;progress=.105;gas=false;braking=false;steer=0;headingOffset=0;collisionCount=0;collisionRecovery=0;hitLock=0;driveDirection=1;throttleResponse=0;playerHeading=headingAt(progress);
- traffic.forEach((v,i)=>{v.t=v.oncoming?0.91-(i%7)*0.105:0.23+(i%7)*0.095;v.lane=v.homeLane;v.cruiseSpeed=randomBetween(v.oncoming?SPEED_SETTINGS.aiOncomingMinKmh:SPEED_SETTINGS.aiSameDirectionMinKmh,v.oncoming?SPEED_SETTINGS.aiOncomingMaxKmh:SPEED_SETTINGS.aiSameDirectionMaxKmh)*KMH_TO_MPS;v.speed=v.cruiseSpeed;v.speedRecovery=0;v.hitCooldown=0;});
+ traffic.forEach((v,i)=>{v.t=v.oncoming?0.91-(i%7)*0.105:0.23+(i%7)*0.095;v.lane=v.homeLane;v.targetLane=v.homeLane;v.overtaking=false;v.passTarget=null;v.laneChangeCooldown=.4+Math.random()*.8;v.cruiseSpeed=randomBetween(v.oncoming?SPEED_SETTINGS.aiOncomingMinKmh:SPEED_SETTINGS.aiSameDirectionMinKmh,v.oncoming?SPEED_SETTINGS.aiOncomingMaxKmh:SPEED_SETTINGS.aiSameDirectionMaxKmh)*KMH_TO_MPS;v.speed=v.cruiseSpeed;v.speedRecovery=0;v.hitCooldown=0;});
  const spawn=pointAt(progress,lateral,.03);player.position.copy(spawn);playerHeading=headingAt(progress);player.rotation.y=playerHeading;$('speed').textContent='0';$('progress').textContent='11%';$('mission').textContent='Reset complete · Follow the bend';setCheck('checkReset','Reset restores test');showToast('Test reset');
 }
 function showToast(s){$('toast').textContent=s;$('toast').style.opacity=1;clearTimeout(showToast.timer);showToast.timer=setTimeout(()=>$('toast').style.opacity=0,1200);}
@@ -247,13 +247,38 @@ function update(dt){
   v.previousLane=v.lane;
   v.teleportedThisFrame=false;
   let desired=v.homeLane;
+  v.laneChangeCooldown=Math.max(0,v.laneChangeCooldown-dt);
   if(!v.oncoming){
-   for(const other of traffic){if(other===v||other.oncoming)continue;if(Math.abs(other.t-v.t)<.055&&Math.abs(other.lane-v.lane)<1.3){desired=v.homeLane===2.8?5.7:2.8;break;}}
-   v.lane+=THREE.MathUtils.clamp(desired-v.lane,-dt*2.5,dt*2.5);
+   // A recovered AI vehicle may overtake the player by temporarily using the
+   // adjacent same-direction lane, provided the gap and target lane are safe.
+   const gapToPlayer=(progress-v.t)*roadLength;
+   const playerInCurrentLane=Math.abs(lateral-v.lane)<1.55;
+   const playerIsSlower=(speed*KMH_TO_MPS)<v.speed-1.2;
+   if(!v.overtaking&&v.laneChangeCooldown<=0&&playerInCurrentLane&&gapToPlayer>3.5&&gapToPlayer<30&&playerIsSlower){
+    const adjacentLane=v.homeLane===2.8?5.7:2.8;
+    const adjacentClear=!traffic.some(other=>{
+     if(other===v||other.oncoming||Math.abs(other.lane-adjacentLane)>1.45)return false;
+     return Math.abs(other.t-v.t)*roadLength<20;
+    })&&!(Math.abs(lateral-adjacentLane)<1.55&&Math.abs((progress-v.t)*roadLength)<22);
+    if(adjacentClear){v.targetLane=adjacentLane;v.overtaking=true;v.passTarget=player;v.laneChangeCooldown=1.2;}
+   }
+   if(v.overtaking&&Math.abs(v.lane-v.targetLane)<.28){
+    const passed=v.passTarget===player&&v.t>progress+4/roadLength;
+    const homeClear=!traffic.some(other=>other!==v&&!other.oncoming&&Math.abs(other.lane-v.homeLane)<1.45&&Math.abs(other.t-v.t)*roadLength<16)&&
+      !(Math.abs(lateral-v.homeLane)<1.55&&Math.abs((progress-v.t)*roadLength)<15);
+    if(passed&&homeClear){v.targetLane=v.homeLane;v.overtaking=false;v.passTarget=null;v.laneChangeCooldown=2.2;}
+   }
+   // Existing AI-to-AI avoidance also uses the temporary path system.
+   if(!v.overtaking){
+    for(const other of traffic){if(other===v||other.oncoming)continue;if(Math.abs(other.t-v.t)<.055&&Math.abs(other.lane-v.lane)<1.3){desired=v.homeLane===2.8?5.7:2.8;break;}}
+    if(desired!==v.homeLane)v.targetLane=desired;
+    else if(Math.abs(v.lane-v.homeLane)<.28)v.targetLane=v.homeLane;
+   }
+   v.lane+=THREE.MathUtils.clamp(v.targetLane-v.lane,-dt*2.5,dt*2.5);
    v.t+=v.speed*dt/roadLength;
   }else v.t-=v.speed*dt/roadLength;
-  if(v.t>.985){v.t=.12+Math.random()*.08;v.lane=v.homeLane;v.teleportedThisFrame=true;}
-  if(v.t<.02){v.t=.9+Math.random()*.06;v.lane=v.homeLane;v.teleportedThisFrame=true;}
+  if(v.t>.985){v.t=.12+Math.random()*.08;v.lane=v.homeLane;v.targetLane=v.homeLane;v.overtaking=false;v.passTarget=null;v.teleportedThisFrame=true;}
+  if(v.t<.02){v.t=.9+Math.random()*.06;v.lane=v.homeLane;v.targetLane=v.homeLane;v.overtaking=false;v.passTarget=null;v.teleportedThisFrame=true;}
   orientOnCurve(v.mesh,v.t,v.lane);
  }
  // Recycle roadside buildings after they fall behind, placing them farther along the same curve.

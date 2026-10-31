@@ -99,19 +99,22 @@ const player=makeCar(0xf1bd36);world.add(player);
 const noseMarker=new THREE.Mesh(new THREE.ConeGeometry(.27,.72,3),mat(0x00f0ff,.3,.1));noseMarker.rotation.x=-Math.PI/2;noseMarker.position.set(0,1.28,-.72);player.add(noseMarker);
 const traffic=[];const carColors=[0xc94c42,0x287bb5,0xe7e5da,0x3e4a53,0xe5a14b,0x4c9865];
 // Centralized cruise-speed settings: collision response must never rewrite these targets.
-const SPEED_SETTINGS={playerMax:42,aiSameDirectionMin:11,aiSameDirectionMax:20,aiOncomingMin:17,aiOncomingMax:24,aiCollisionRecovery:1.1};
+const KMH_TO_MPS=1/3.6;
+const SPEED_SETTINGS={playerMaxForwardKmh:180,playerMaxReverseKmh:100,aiSameDirectionMinKmh:62,aiSameDirectionMaxKmh:128,aiOncomingMinKmh:72,aiOncomingMaxKmh:115,aiCollisionRecoveryRate:.35};
 function randomBetween(min,max){return min+Math.random()*(max-min);}
-function addTraffic(t,lane,oncoming=false){const car=makeCar(carColors[Math.floor(Math.random()*carColors.length)]);world.add(car);const cruiseSpeed=randomBetween(oncoming?SPEED_SETTINGS.aiOncomingMin:SPEED_SETTINGS.aiSameDirectionMin,oncoming?SPEED_SETTINGS.aiOncomingMax:SPEED_SETTINGS.aiSameDirectionMax);traffic.push({mesh:car,t,lane,homeLane:lane,oncoming,cruiseSpeed,speed:cruiseSpeed,speedRecovery:0,change:0,hitCooldown:0});}
+function addTraffic(t,lane,oncoming=false){const car=makeCar(carColors[Math.floor(Math.random()*carColors.length)]);world.add(car);const cruiseSpeed=randomBetween(oncoming?SPEED_SETTINGS.aiOncomingMinKmh:SPEED_SETTINGS.aiSameDirectionMinKmh,oncoming?SPEED_SETTINGS.aiOncomingMaxKmh:SPEED_SETTINGS.aiSameDirectionMaxKmh)*KMH_TO_MPS;traffic.push({mesh:car,t,lane,homeLane:lane,oncoming,cruiseSpeed,speed:cruiseSpeed,speedRecovery:0,change:0,hitCooldown:0});}
 for(let i=0;i<7;i++){addTraffic(.23+i*.095,[2.8,5.7][i%2],false);addTraffic(.91-i*.105,[-2.8,-5.7][i%2],true);}
-const buildings=[];for(let i=0;i<42;i++){const t=(i%21)/20;const side=i<21?-1:1;const p=pointAt(t,side*(13+Math.random()*12),0);const h=4+Math.random()*18,w=3+Math.random()*7,d=4+Math.random()*8;const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat([0xbab2a3,0xd2c4a9,0x8d9ba1,0xc2a58b][i%4]));b.position.set(p.x, h/2-.15,p.z);const tangent=roadCurve.getTangentAt(t);b.rotation.y=Math.atan2(-tangent.x,-tangent.z)+(Math.random()-.5)*.3;world.add(b);buildings.push(b);}
+const buildings=[];for(let i=0;i<42;i++){const t=(i%21)/20;const side=i<21?-1:1;const offset=side*(13+Math.random()*12);const p=pointAt(t,offset,0);const h=4+Math.random()*18,w=3+Math.random()*7,d=4+Math.random()*8;const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat([0xbab2a3,0xd2c4a9,0x8d9ba1,0xc2a58b][i%4]));b.position.set(p.x,h/2-.15,p.z);const tangent=roadCurve.getTangentAt(t);b.rotation.y=Math.atan2(-tangent.x,-tangent.z)+(Math.random()-.5)*.3;world.add(b);buildings.push({mesh:b,offset,t,h,rotationJitter:(Math.random()-.5)*.3});}
 let active=false,gas=false,braking=false,steer=0,speed=0,lateral=2.8,progress=.105,last=performance.now(),collisionCount=0,collisionRecovery=0,hitLock=0,driveDirection=1,headingOffset=0,playerHeading=0;
-const maxSpeed=SPEED_SETTINGS.playerMax;
+const maxForwardSpeed=SPEED_SETTINGS.playerMaxForwardKmh*KMH_TO_MPS;
+const maxReverseSpeed=SPEED_SETTINGS.playerMaxReverseKmh*KMH_TO_MPS;
+const maxSpeed=maxForwardSpeed;
 function setCheck(id,text){$(id).textContent='✓ '+text;}
 setCheck('checkCurve','Road curve rendered');
 function orientOnCurve(mesh,t,offset,extraHeading=0){const p=pointAt(t,offset,.03);const tan=roadCurve.getTangentAt(THREE.MathUtils.clamp(t,0,1)).normalize();mesh.position.copy(p);mesh.rotation.y=Math.atan2(-tan.x,-tan.z)+extraHeading;return p;}
 function reset(){
  speed=0;lateral=2.8;progress=.105;gas=false;braking=false;steer=0;headingOffset=0;collisionCount=0;collisionRecovery=0;hitLock=0;driveDirection=1;playerHeading=headingAt(progress);
- traffic.forEach((v,i)=>{v.t = v.oncoming ? 0.91 - (i%7)*0.105 : 0.23 + (i%7)*0.095;v.lane=v.homeLane;v.cruiseSpeed=randomBetween(v.oncoming?SPEED_SETTINGS.aiOncomingMin:SPEED_SETTINGS.aiSameDirectionMin,v.oncoming?SPEED_SETTINGS.aiOncomingMax:SPEED_SETTINGS.aiSameDirectionMax);v.speed=v.cruiseSpeed;v.speedRecovery=0;v.hitCooldown=0;});
+ traffic.forEach((v,i)=>{v.t=v.oncoming?0.91-(i%7)*0.105:0.23+(i%7)*0.095;v.lane=v.homeLane;v.cruiseSpeed=randomBetween(v.oncoming?SPEED_SETTINGS.aiOncomingMinKmh:SPEED_SETTINGS.aiSameDirectionMinKmh,v.oncoming?SPEED_SETTINGS.aiOncomingMaxKmh:SPEED_SETTINGS.aiSameDirectionMaxKmh)*KMH_TO_MPS;v.speed=v.cruiseSpeed;v.speedRecovery=0;v.hitCooldown=0;});
  const spawn=pointAt(progress,lateral,.03);player.position.copy(spawn);playerHeading=headingAt(progress);player.rotation.y=playerHeading;$('speed').textContent='0';$('progress').textContent='11%';$('mission').textContent='Reset complete · Follow the bend';setCheck('checkReset','Reset restores test');showToast('Test reset');
 }
 function showToast(s){$('toast').textContent=s;$('toast').style.opacity=1;clearTimeout(showToast.timer);showToast.timer=setTimeout(()=>$('toast').style.opacity=0,1200);}
@@ -185,8 +188,8 @@ function collide(previousPlayer){
     b.t=THREE.MathUtils.clamp(midpoint+(aWasAhead?-gap*.5:gap*.5),.025,.975);
     a.lane=a.previousLane;b.lane=b.previousLane;
     if(a.hitCooldown<=0&&b.hitCooldown<=0){
-     a.speed=Math.max(7,a.speed*.7);
-     b.speed=Math.max(7,b.speed*.7);
+     a.speed=Math.max(12*KMH_TO_MPS,a.speed*.65);
+     b.speed=Math.max(12*KMH_TO_MPS,b.speed*.65);
      a.hitCooldown=b.hitCooldown=1.1;
      showToast('Traffic collision blocked');
     }
@@ -200,7 +203,7 @@ function update(dt){
  const accel=gas&&collisionRecovery<=0?1:0,brake=braking?1:0;
  if(collisionRecovery>0)collisionRecovery=Math.max(0,collisionRecovery-dt);
  if(hitLock>0)hitLock=Math.max(0,hitLock-dt);
- if(accel)speed=Math.min(maxSpeed,speed+dt*13);else speed=Math.max(0,speed-dt*1.2);
+ if(accel)speed=Math.min(driveDirection<0?maxReverseSpeed:maxForwardSpeed,speed+dt*13);else speed=Math.max(0,speed-dt*1.2);
  if(brake)speed=Math.max(0,speed-dt*25);
  // Steering changes the car's own heading. The car travels along that heading
  // in world space; it is NOT advanced along the road curve automatically.
@@ -215,6 +218,7 @@ function update(dt){
  if(Math.abs(lateral)>7.18){lateral=Math.sign(lateral)*7.18;const edge=pointAt(progress,lateral,.03);player.position.x=edge.x;player.position.z=edge.z;speed=0;$('mission').textContent='Road edge reached · steer to follow the bend';showToast('Road boundary reached');}
  for(const v of traffic){
   v.hitCooldown=Math.max(0,v.hitCooldown-dt);
+  v.speed=Math.min(v.cruiseSpeed,v.speed+Math.max(8*KMH_TO_MPS,v.cruiseSpeed*SPEED_SETTINGS.aiCollisionRecoveryRate)*dt);
   v.previousT=v.t;
   v.previousLane=v.lane;
   v.teleportedThisFrame=false;
@@ -228,6 +232,8 @@ function update(dt){
   if(v.t<.02){v.t=.9+Math.random()*.06;v.lane=v.homeLane;v.teleportedThisFrame=true;}
   orientOnCurve(v.mesh,v.t,v.lane);
  }
+ // Recycle roadside buildings after they fall behind, placing them farther along the same curve.
+ for(const item of buildings){if(item.t<progress-.055){item.t=Math.min(.965,progress+.42+Math.random()*.22);const bp=pointAt(item.t,item.offset,0);item.mesh.position.set(bp.x,item.h/2-.15,bp.z);const bt=roadCurve.getTangentAt(item.t);item.mesh.rotation.y=Math.atan2(-bt.x,-bt.z)+item.rotationJitter;}}
  if(Math.abs(steer)>.01)setCheck('checkPlayer','Steering follows curve');
  if(traffic.some(v=>Math.abs(roadCurve.getTangentAt(v.t).x)>.12))setCheck('checkTraffic','AI follows curve');
  collide(previousPlayer);

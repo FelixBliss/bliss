@@ -92,25 +92,33 @@ traffic.forEach(o=>{
  u.collisionCooldown=Math.max(0,u.collisionCooldown-dt);u.speed=Math.min(u.cruiseSpeed,u.speed+Math.max(8,u.cruiseSpeed*.35)*dt);
  // Same-direction traffic ahead has smaller Z; oncoming traffic ahead has larger Z.
  const isAhead=t=>u.oncoming?t.position.z>o.position.z:t.position.z<o.position.z;
- const nearestAhead=()=>traffic.filter(t=>t!==o&&t.userData.oncoming===u.oncoming&&Math.abs(t.position.x-o.position.x)<1.45&&isAhead(t))
-   .sort((a,b)=>Math.abs(a.position.z-o.position.z)-Math.abs(b.position.z-o.position.z))[0];
+ const nearestAhead=()=>{
+   const candidates=traffic.filter(t=>t!==o&&t.userData.oncoming===u.oncoming&&Math.abs(t.position.x-o.position.x)<1.45&&isAhead(t));
+   // Treat the player as traffic to be passed when travelling in the same direction.
+   if(!u.oncoming&&!reverse&&Math.abs(player.position.x-o.position.x)<1.45&&isAhead(player))candidates.push(player);
+   return candidates.sort((a,b)=>Math.abs(a.position.z-o.position.z)-Math.abs(b.position.z-o.position.z))[0];
+ };
  let aheadInLane=nearestAhead(),v=u.speed;
- if(aheadInLane){const gap=Math.abs(aheadInLane.position.z-o.position.z);const safeGap=10+u.speed*.075;if(gap<safeGap)v=Math.min(v,Math.max(0,aheadInLane.userData.speed-((safeGap-gap)*2.2)))}
- const closeAhead=aheadInLane&&aheadInLane.userData.speed<u.speed-2&&Math.abs(aheadInLane.position.z-o.position.z)<22;
+ const aheadSpeed=aheadInLane?(aheadInLane===player?Math.abs(speed):aheadInLane.userData.speed):0;
+ if(aheadInLane){const gap=Math.abs(aheadInLane.position.z-o.position.z);const safeGap=10+u.speed*.075;if(gap<safeGap)v=Math.min(v,Math.max(0,aheadSpeed-((safeGap-gap)*2.2)))}
+ const closeAhead=aheadInLane&&aheadSpeed<u.speed-2&&Math.abs(aheadInLane.position.z-o.position.z)<22;
  if(closeAhead&&!u.overtaking&&u.changeCooldown<=0){
    const otherLane=lanes.find(x=>Math.abs(x-u.lane)>1);
-   const laneClear=otherLane!==undefined&&!traffic.some(t=>{if(t===o||t.userData.oncoming!==u.oncoming||Math.abs(t.position.x-otherLane)>=1.6)return false;const gap=Math.abs(t.position.z-o.position.z);const closingSpeed=u.speed-t.userData.speed;const safeGap=14+u.speed*.08;return gap<safeGap||(t.position.z<o.position.z&&closingSpeed< -18&&gap<32)});
+   const laneClear=otherLane!==undefined&&!traffic.some(t=>{if(t===o||t.userData.oncoming!==u.oncoming||Math.abs(t.position.x-otherLane)>=1.6)return false;const gap=Math.abs(t.position.z-o.position.z);const closingSpeed=u.speed-t.userData.speed;const safeGap=14+u.speed*.08;return gap<safeGap||(t.position.z<o.position.z&&closingSpeed< -18&&gap<32)})&&
+     (u.oncoming||reverse||Math.abs(player.position.x-otherLane)>=1.6||Math.abs(player.position.z-o.position.z)>22);
    if(laneClear){u.targetLane=otherLane;u.overtaking=true;u.passTarget=aheadInLane;u.changeCooldown=2}
  }
  if(u.overtaking&&Math.abs(o.position.x-u.targetLane)<.25){
    const target=u.passTarget;
-   const passed=!target||!traffic.includes(target)||Math.abs(target.position.z-o.position.z)>22||(u.oncoming?o.position.z>target.position.z+4:o.position.z<target.position.z-4);
-   const homeClear=!traffic.some(t=>t!==o&&t.userData.oncoming===u.oncoming&&Math.abs(t.position.x-u.homeLane)<1.6&&Math.abs(t.position.z-o.position.z)<14);
+   const targetStillValid=target===player||traffic.includes(target);
+   const passed=!target||!targetStillValid||Math.abs(target.position.z-o.position.z)>22||(u.oncoming?o.position.z>target.position.z+4:o.position.z<target.position.z-4);
+   const homeClear=!traffic.some(t=>t!==o&&t.userData.oncoming===u.oncoming&&Math.abs(t.position.x-u.homeLane)<1.6&&Math.abs(t.position.z-o.position.z)<14)&&
+     (u.oncoming||reverse||Math.abs(player.position.x-u.homeLane)>=1.6||Math.abs(player.position.z-o.position.z)>=14);
    if(passed&&homeClear){u.targetLane=u.homeLane;u.overtaking=false;u.passTarget=null;u.changeCooldown=2.5}
  }
  o.position.x+=Math.sign(u.targetLane-o.position.x)*Math.min(Math.abs(u.targetLane-o.position.x),4.6*dt);
  const finalAhead=nearestAhead();
- if(finalAhead){const gap=Math.abs(finalAhead.position.z-o.position.z);const safeGap=8+u.speed*.06;if(gap<safeGap)v=Math.min(v,Math.max(0,finalAhead.userData.speed-((safeGap-gap)*2.6)))}
+ if(finalAhead){const gap=Math.abs(finalAhead.position.z-o.position.z);const safeGap=8+u.speed*.06;const finalAheadSpeed=finalAhead===player?Math.abs(speed):finalAhead.userData.speed;if(gap<safeGap)v=Math.min(v,Math.max(0,finalAheadSpeed-((safeGap-gap)*2.6)))}
  const previousZ=o.position.z;
  const dz=u.oncoming?(Math.abs(worldVelocity)+v)*dt:(worldVelocity-v)*dt;
  let nextZ=o.position.z+dz;

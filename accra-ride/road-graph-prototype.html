@@ -162,7 +162,9 @@ function collide(previousPlayer){
    }
   }
  }
- // AI-to-AI impacts also roll both cars back, so they cannot pass through each other.
+ // AI-to-AI swept collisions: separate the pair once, then apply one
+ // cooldown-limited impact penalty. Repeated rollback was multiplying both
+ // speeds every frame and trapping traffic in a permanent collision loop.
  for(let i=0;i<traffic.length;i++){
   const a=traffic[i];if(a.teleportedThisFrame)continue;
   for(let j=i+1;j<traffic.length;j++){
@@ -173,10 +175,19 @@ function collide(previousPlayer){
     {progress:b.previousT,lateral:b.previousLane},
     {progress:b.t,lateral:b.lane}
    )){
-    a.t=a.previousT;a.lane=a.previousLane;b.t=b.previousT;b.lane=b.previousLane;
-    a.speed=Math.max(0,a.speed*.45);b.speed=Math.max(0,b.speed*.45);
+    const gap=6.2/roadLength;
+    const midpoint=(a.t+b.t)*.5;
+    const aWasAhead=a.previousT>=b.previousT;
+    a.t=THREE.MathUtils.clamp(midpoint+(aWasAhead?gap*.5:-gap*.5),.025,.975);
+    b.t=THREE.MathUtils.clamp(midpoint+(aWasAhead?-gap*.5:gap*.5),.025,.975);
+    a.lane=a.previousLane;b.lane=b.previousLane;
+    if(a.hitCooldown<=0&&b.hitCooldown<=0){
+     a.speed=Math.max(7,a.speed*.7);
+     b.speed=Math.max(7,b.speed*.7);
+     a.hitCooldown=b.hitCooldown=1.1;
+     showToast('Traffic collision blocked');
+    }
     orientOnCurve(a.mesh,a.t,a.lane);orientOnCurve(b.mesh,b.t,b.lane);
-    if(a.hitCooldown<=0&&b.hitCooldown<=0){a.hitCooldown=b.hitCooldown=1.1;showToast('Traffic collision blocked');}
    }
   }
  }

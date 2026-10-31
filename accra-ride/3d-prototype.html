@@ -47,7 +47,7 @@ const steeringWheel=new THREE.Group();const steeringMaterial=mat(0x17191b,.35,.1
 const headlamps=[];for(const x of [-.43,.43]){const lamp=new THREE.SpotLight(0xfff1ce,0,68,Math.PI/7,.45,1.3);lamp.position.set(x,.57,-1.43);lamp.target.position.set(x,-.05,-28);player.add(lamp);player.add(lamp.target);headlamps.push(lamp);const lens=new THREE.Mesh(new THREE.BoxGeometry(.3,.15,.055),mat(0xfff4c8,.25));lens.position.set(x,.61,-1.43);player.add(lens);const glow=new THREE.PointLight(0xffe7a1,0,4);glow.position.set(x,.6,-1.5);player.add(glow);headlamps.push(glow)}
 const traffic=[];const sameReverseTraffic=new Set();const colors=[0xd94b40,0x287cb6,0xe4e4dc,0x3b4a54,0xe3a34b,0x4b9a66];
 const sameLanes=[2.75,6.25],opposingLanes=[-6.25,-2.75];
-function addTraffic(z,lane,oncoming=false,bike=false){const o=car(bike?0x262d31:colors[Math.floor(Math.random()*colors.length)],bike);o.position.set(lane,0,z);const baseSpeed=oncoming?72+Math.random()*43:bike?82+Math.random()*48:62+Math.random()*66;o.userData={lane,targetLane:lane,homeLane:lane,oncoming,bike,baseZ:z,speed:baseSpeed,overtaking:false,passTarget:null,changeCooldown:.12+Math.random()*.45,collisionCooldown:0};scene.add(o);traffic.push(o)}
+function addTraffic(z,lane,oncoming=false,bike=false){const o=car(bike?0x262d31:colors[Math.floor(Math.random()*colors.length)],bike);o.position.set(lane,0,z);const baseSpeed=oncoming?72+Math.random()*43:bike?82+Math.random()*48:62+Math.random()*66;o.userData={lane,targetLane:lane,homeLane:lane,oncoming,bike,baseZ:z,speed:baseSpeed,cruiseSpeed:baseSpeed,overtaking:false,passTarget:null,changeCooldown:.12+Math.random()*.45,collisionCooldown:0};scene.add(o);traffic.push(o)}
 // Denser highway flow: varied speeds let some vehicles pull ahead while others are passed.
 for(let i=0;i<16;i++){addTraffic(-18-i*(11+Math.random()*3),sameLanes[Math.floor(Math.random()*sameLanes.length)],false,i%5===2);addTraffic(-27-i*(12+Math.random()*3),opposingLanes[Math.floor(Math.random()*opposingLanes.length)],true,i%6===3)}
 // Simple junction with cross street and working traffic signal.
@@ -56,7 +56,7 @@ const pole=box(.16,4,.16,mat(0x343a3d),-7,1.8,junctionZ-4);const signal=box(.6,1
 let lightPhase=0,lightTime=0,redWarning=false;
 let speed=0,steer=0,steerTarget=0,lateralVelocity=0,gas=false,brake=false,reverse=false,active=false,coins=20,hitLock=0,collisionRecovery=0,driveDistance=0,last=performance.now(),wheelTouch=null,gasLevel=0,brakeLevel=0,throttleResponse=0,cameraMode=0,lightsOn=false,audioCtx=null,engineOsc=null,engineGain=null,hornOsc=null,hornGain=null;
 function say(t){$('toast').textContent=t;$('toast').style.opacity=1;clearTimeout(say.timer);say.timer=setTimeout(()=>$('toast').style.opacity=0,1800)}
-function reset(){sameReverseTraffic.clear();speed=0;steer=0;steerTarget=0;lateralVelocity=0;gas=false;brake=false;collisionRecovery=0;gasLevel=0;brakeLevel=0;throttleResponse=0;driveDistance=0;redWarning=false;reverse=false;$('gear').textContent='GEAR: D';player.position.set(2.75,0,3.1);coins=20;$('coins').textContent=coins;let sameIndex=0,oncomingIndex=0;traffic.forEach(o=>{const u=o.userData;const index=u.oncoming?oncomingIndex++:sameIndex++;o.position.z=u.oncoming?-27-index*14:-18-index*13;u.lane=u.oncoming?opposingLanes[index%2]:sameLanes[index%2];u.homeLane=u.lane;u.targetLane=u.lane;u.overtaking=false;u.passTarget=null;u.changeCooldown=.2+Math.random()*.6;u.collisionCooldown=0;o.position.x=u.lane});say('Accelerate to build speed; brake for red lights')}
+function reset(){sameReverseTraffic.clear();speed=0;steer=0;steerTarget=0;lateralVelocity=0;gas=false;brake=false;collisionRecovery=0;gasLevel=0;brakeLevel=0;throttleResponse=0;driveDistance=0;redWarning=false;reverse=false;$('gear').textContent='GEAR: D';player.position.set(2.75,0,3.1);coins=20;$('coins').textContent=coins;let sameIndex=0,oncomingIndex=0;traffic.forEach(o=>{const u=o.userData;const index=u.oncoming?oncomingIndex++:sameIndex++;o.position.z=u.oncoming?-27-index*14:-18-index*13;u.lane=u.oncoming?opposingLanes[index%2]:sameLanes[index%2];u.homeLane=u.lane;u.targetLane=u.lane;u.overtaking=false;u.passTarget=null;u.changeCooldown=.2+Math.random()*.6;u.collisionCooldown=0;u.speed=u.cruiseSpeed;o.position.x=u.lane});say('Accelerate to build speed; brake for red lights')}
 function bindHold(id,fn,levelSetter){const e=$(id);let heldPointer=null;const down=ev=>{ev.preventDefault();ev.stopPropagation();if(heldPointer!==null)return;heldPointer=ev.pointerId;e.classList.add('down');fn(true);levelSetter(1);try{e.setPointerCapture(ev.pointerId)}catch{}};const up=ev=>{if(ev&&heldPointer!==null&&ev.pointerId!==heldPointer)return;if(ev)ev.preventDefault();heldPointer=null;e.classList.remove('down');fn(false);levelSetter(0)};e.addEventListener('pointerdown',down);['pointerup','pointercancel','lostpointercapture'].forEach(n=>e.addEventListener(n,up));e.addEventListener('contextmenu',ev=>ev.preventDefault())}
 bindHold('gas',v=>gas=v,v=>gasLevel=v);bindHold('brake',v=>brake=v,v=>brakeLevel=v);
 $('gear').addEventListener('click',()=>{if(Math.abs(speed)>2){say('Brake to a near stop before changing gear');return}reverse=!reverse;$('gear').textContent=reverse?'GEAR: R':'GEAR: D';if(reverse){let n=0;traffic.forEach(o=>{const u=o.userData;if(!u.oncoming&&n<8){o.position.z=18+n*15;o.position.x=u.lane;sameReverseTraffic.add(o);n++}})}else{sameReverseTraffic.clear()}say(reverse?'Reverse selected — hold ACCEL':'Drive selected — hold ACCEL')});
@@ -89,7 +89,7 @@ medianFlowers.forEach(p=>{p.position.z+=worldVelocity*dt;if(p.position.z>13)p.po
 traffic.forEach(o=>{
  const u=o.userData,lanes=u.oncoming?opposingLanes:sameLanes;const previousX=o.position.x;
  u.changeCooldown=Math.max(0,u.changeCooldown-dt);
- u.collisionCooldown=Math.max(0,u.collisionCooldown-dt);
+ u.collisionCooldown=Math.max(0,u.collisionCooldown-dt);u.speed=Math.min(u.cruiseSpeed,u.speed+Math.max(8,u.cruiseSpeed*.35)*dt);
  // Same-direction traffic ahead has smaller Z; oncoming traffic ahead has larger Z.
  const isAhead=t=>u.oncoming?t.position.z>o.position.z:t.position.z<o.position.z;
  const nearestAhead=()=>traffic.filter(t=>t!==o&&t.userData.oncoming===u.oncoming&&Math.abs(t.position.x-o.position.x)<1.45&&isAhead(t))
@@ -139,7 +139,7 @@ traffic.forEach(o=>{
    if(rearImpact){
      // Only slow the AI vehicle that struck the player from behind.
      if(u.collisionCooldown<=0){
-       u.speed=Math.max(12,u.speed*.5);
+       u.speed=Math.max(12,u.speed*.65);
        u.changeCooldown=Math.max(u.changeCooldown,1.2);
        u.collisionCooldown=1.3;
        say('Rear impact! AI car slowed');

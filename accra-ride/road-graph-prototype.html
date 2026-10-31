@@ -105,15 +105,16 @@ function randomBetween(min,max){return min+Math.random()*(max-min);}
 function addTraffic(t,lane,oncoming=false){const car=makeCar(carColors[Math.floor(Math.random()*carColors.length)]);world.add(car);const cruiseSpeed=randomBetween(oncoming?SPEED_SETTINGS.aiOncomingMinKmh:SPEED_SETTINGS.aiSameDirectionMinKmh,oncoming?SPEED_SETTINGS.aiOncomingMaxKmh:SPEED_SETTINGS.aiSameDirectionMaxKmh)*KMH_TO_MPS;traffic.push({mesh:car,t,lane,homeLane:lane,oncoming,cruiseSpeed,speed:cruiseSpeed,speedRecovery:0,change:0,hitCooldown:0});}
 for(let i=0;i<7;i++){addTraffic(.23+i*.095,[2.8,5.7][i%2],false);addTraffic(.91-i*.105,[-2.8,-5.7][i%2],true);}
 const buildings=[];for(let i=0;i<42;i++){const t=(i%21)/20;const side=i<21?-1:1;const offset=side*(13+Math.random()*12);const p=pointAt(t,offset,0);const h=4+Math.random()*18,w=3+Math.random()*7,d=4+Math.random()*8;const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat([0xbab2a3,0xd2c4a9,0x8d9ba1,0xc2a58b][i%4]));b.position.set(p.x,h/2-.15,p.z);const tangent=roadCurve.getTangentAt(t);b.rotation.y=Math.atan2(-tangent.x,-tangent.z)+(Math.random()-.5)*.3;world.add(b);buildings.push({mesh:b,offset,t,h,rotationJitter:(Math.random()-.5)*.3});}
-let active=false,gas=false,braking=false,steer=0,speed=0,lateral=2.8,progress=.105,last=performance.now(),collisionCount=0,collisionRecovery=0,hitLock=0,driveDirection=1,headingOffset=0,playerHeading=0;
-const maxForwardSpeed=SPEED_SETTINGS.playerMaxForwardKmh*KMH_TO_MPS;
-const maxReverseSpeed=SPEED_SETTINGS.playerMaxReverseKmh*KMH_TO_MPS;
+let active=false,gas=false,braking=false,steer=0,speed=0,lateral=2.8,progress=.105,last=performance.now(),collisionCount=0,collisionRecovery=0,hitLock=0,driveDirection=1,headingOffset=0,playerHeading=0,throttleResponse=0;
+// Player speed is stored in km/h, matching the master prototype.
+const maxForwardSpeed=SPEED_SETTINGS.playerMaxForwardKmh;
+const maxReverseSpeed=SPEED_SETTINGS.playerMaxReverseKmh;
 const maxSpeed=maxForwardSpeed;
 function setCheck(id,text){$(id).textContent='✓ '+text;}
 setCheck('checkCurve','Road curve rendered');
 function orientOnCurve(mesh,t,offset,extraHeading=0){const p=pointAt(t,offset,.03);const tan=roadCurve.getTangentAt(THREE.MathUtils.clamp(t,0,1)).normalize();mesh.position.copy(p);mesh.rotation.y=Math.atan2(-tan.x,-tan.z)+extraHeading;return p;}
 function reset(){
- speed=0;lateral=2.8;progress=.105;gas=false;braking=false;steer=0;headingOffset=0;collisionCount=0;collisionRecovery=0;hitLock=0;driveDirection=1;playerHeading=headingAt(progress);
+ speed=0;lateral=2.8;progress=.105;gas=false;braking=false;steer=0;headingOffset=0;collisionCount=0;collisionRecovery=0;hitLock=0;driveDirection=1;throttleResponse=0;playerHeading=headingAt(progress);
  traffic.forEach((v,i)=>{v.t=v.oncoming?0.91-(i%7)*0.105:0.23+(i%7)*0.095;v.lane=v.homeLane;v.cruiseSpeed=randomBetween(v.oncoming?SPEED_SETTINGS.aiOncomingMinKmh:SPEED_SETTINGS.aiSameDirectionMinKmh,v.oncoming?SPEED_SETTINGS.aiOncomingMaxKmh:SPEED_SETTINGS.aiSameDirectionMaxKmh)*KMH_TO_MPS;v.speed=v.cruiseSpeed;v.speedRecovery=0;v.hitCooldown=0;});
  const spawn=pointAt(progress,lateral,.03);player.position.copy(spawn);playerHeading=headingAt(progress);player.rotation.y=playerHeading;$('speed').textContent='0';$('progress').textContent='11%';$('mission').textContent='Reset complete · Follow the bend';setCheck('checkReset','Reset restores test');showToast('Test reset');
 }
@@ -200,11 +201,24 @@ function collide(previousPlayer){
 }
 function update(dt){
  const previousPlayer={progress,lateral,x:player.position.x,z:player.position.z,heading:playerHeading};
- const accel=gas&&collisionRecovery<=0?1:0,brake=braking?1:0;
  if(collisionRecovery>0)collisionRecovery=Math.max(0,collisionRecovery-dt);
  if(hitLock>0)hitLock=Math.max(0,hitLock-dt);
- if(accel)speed=Math.min(driveDirection<0?maxReverseSpeed:maxForwardSpeed,speed+dt*13);else speed=Math.max(0,speed-dt*1.2);
- if(brake)speed=Math.max(0,speed-dt*25);
+ // Match the master prototype's progressive throttle response, acceleration,
+ // coasting drag and speed-dependent braking.
+ const requestedThrottle=gas&&!braking&&collisionRecovery<=0?1:0;
+ throttleResponse+=(requestedThrottle-throttleResponse)*Math.min(1,dt*(requestedThrottle?2.4:3.2));
+ const throttle=throttleResponse;
+ const acceleration=driveDirection<0?16:18+Math.min(12,Math.abs(speed)*.12);
+ if(throttle>0)speed+=acceleration*throttle*dt;
+ if(Math.abs(speed)>.1){
+  const drag=.006*Math.abs(speed)+.00016*speed*speed;
+  speed=Math.max(0,speed-drag*dt);
+ }
+ if(braking&&speed>.05){
+  const deceleration=driveDirection<0?42:Math.min(82,62+Math.abs(speed)*.12);
+  speed=Math.max(0,speed-deceleration*dt);
+ }
+ speed=Math.min(driveDirection<0?maxReverseSpeed:maxForwardSpeed,speed);
  // Steering changes the car's own heading. The car travels along that heading
  // in world space; it is NOT advanced along the road curve automatically.
  if(steer!==0){const turnRate=0.42+Math.min(speed/3.6,18)*0.025;playerHeading-=steer*turnRate*dt*(driveDirection<0?-1:1);}
@@ -237,7 +251,7 @@ function update(dt){
  if(Math.abs(steer)>.01)setCheck('checkPlayer','Steering follows curve');
  if(traffic.some(v=>Math.abs(roadCurve.getTangentAt(v.t).x)>.12))setCheck('checkTraffic','AI follows curve');
  collide(previousPlayer);
- $('speed').textContent=Math.round(speed*3.6);
+ $('speed').textContent=Math.round(speed);
  $('progress').textContent=Math.round(progress*100)+'%';
  const roadHeading=headingAt(progress);const angleDeg=r=>Math.round(THREE.MathUtils.euclideanModulo(r+Math.PI,Math.PI*2)*180/Math.PI-180);
  $('headingDiag').textContent=angleDeg(playerHeading)+'° / '+angleDeg(roadHeading)+'°';

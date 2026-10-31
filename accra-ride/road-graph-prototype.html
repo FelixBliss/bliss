@@ -155,13 +155,23 @@ function collide(previousPlayer){
    v.t=THREE.MathUtils.clamp(progress+(wasAhead?separation:-separation),.025,.975);
    v.lane=v.previousLane;
    orientOnCurve(v.mesh,v.t,v.lane);
-   // One global player lock prevents multiple vehicles or repeated contact
-   // frames from stacking the speed penalty during the same impact event.
-   if(hitLock<=0){
+   // Match master behavior: a same-direction vehicle striking from behind
+   // takes the speed penalty; the player keeps moving. Other impacts slow the player.
+   const rearImpact=!v.oncoming&&!wasAhead;
+   if(rearImpact){
+    if(v.hitCooldown<=0){
+     v.speed=Math.max(12*KMH_TO_MPS,v.speed*.5);
+     v.hitCooldown=1.3;
+     collisionCount++;
+     setCheck('checkCollision','Rear-impact response');
+     $('mission').textContent='Rear impact · traffic vehicle slowed';
+     showToast('Rear impact — vehicle slowed');
+    }
+   }else if(hitLock<=0){
     speed*=.42;
     collisionRecovery=.7;
+    throttleResponse=0;
     hitLock=1.3;
-    // Keep the AI's configured cruise speed; the impact only separates vehicles.
     collisionCount++;v.hitCooldown=1.3;
     setCheck('checkCollision','Collision response');
     $('mission').textContent='Impact · steer clear; throttle recovers shortly';

@@ -245,7 +245,18 @@ function bindHold(id,on,off){const el=$(id);const start=e=>{e.preventDefault();o
 bindHold('gas',()=>gas=true,()=>gas=false);bindHold('brake',()=>braking=true,()=>braking=false);
 bindHold('left',()=>steer=-1,()=>{if(steer===-1)steer=0;});bindHold('right',()=>steer=1,()=>{if(steer===1)steer=0;});
 $('reset').addEventListener('click',reset);
-$('start').addEventListener('click',()=>{$('startcover').style.display='none';active=true;reset();showToast('Curved-road test started');});
+function startTestDrive(e){
+  if(e){e.preventDefault();e.stopPropagation();}
+  if(active)return;
+  $('startcover').style.display='none';
+  active=true;
+  reset();
+  showToast('Curved-road test started');
+}
+const startButton=$('start');
+startButton.addEventListener('pointerdown',startTestDrive,{passive:false});
+startButton.addEventListener('click',startTestDrive);
+startButton.addEventListener('touchend',startTestDrive,{passive:false});
 window.addEventListener('keydown',e=>{if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault();if(e.key==='ArrowUp'||e.key==='w'||e.key==='W')gas=true;if(e.key==='ArrowDown'||e.key==='s'||e.key==='S')braking=true;if(e.key==='ArrowLeft'||e.key==='a'||e.key==='A')steer=-1;if(e.key==='ArrowRight'||e.key==='d'||e.key==='D')steer=1;if(e.key==='r'||e.key==='R')reset();});
 window.addEventListener('keyup',e=>{if(e.key==='ArrowUp'||e.key==='w'||e.key==='W')gas=false;if(e.key==='ArrowDown'||e.key==='s'||e.key==='S')braking=false;if(['ArrowLeft','a','A','ArrowRight','d','D'].includes(e.key))steer=0;});
 window.addEventListener('blur',()=>{gas=false;braking=false;steer=0;});

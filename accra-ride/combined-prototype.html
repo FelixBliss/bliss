@@ -22,10 +22,17 @@ const mat=(c,r=.85,m=0)=>new THREE.MeshStandardMaterial({color:c,roughness:r,met
 const asphalt=mat(0x343b40),grass=mat(0x6d965d),line=mat(0xf5f0dd),yellow=mat(0xe8bd42),concrete=mat(0xaaa99e),dark=mat(0x20262b),glass=mat(0x8ab9c8,.35,.1);
 const world=new THREE.Group();scene.add(world);
 const roadCurve=new THREE.CatmullRomCurve3([
- new THREE.Vector3(0,0,85),new THREE.Vector3(0,0,55),new THREE.Vector3(2,0,30),
- new THREE.Vector3(9,0,5),new THREE.Vector3(17,0,-20),new THREE.Vector3(19,0,-43),
- new THREE.Vector3(11,0,-66),new THREE.Vector3(-4,0,-87),new THREE.Vector3(-18,0,-111),
- new THREE.Vector3(-23,0,-137),new THREE.Vector3(-18,0,-161)
+ // Long opening straight
+ new THREE.Vector3(0,0,150),new THREE.Vector3(0,0,115),new THREE.Vector3(0,0,80),
+ new THREE.Vector3(0,0,45),new THREE.Vector3(0,0,10),
+ // Broad right-hand bend
+ new THREE.Vector3(3,0,-18),new THREE.Vector3(12,0,-43),new THREE.Vector3(22,0,-70),
+ // Straight connector
+ new THREE.Vector3(25,0,-105),new THREE.Vector3(25,0,-140),new THREE.Vector3(25,0,-175),
+ // Broad left-hand bend
+ new THREE.Vector3(21,0,-203),new THREE.Vector3(7,0,-228),new THREE.Vector3(-10,0,-252),
+ // Final straight
+ new THREE.Vector3(-15,0,-285),new THREE.Vector3(-15,0,-320),new THREE.Vector3(-15,0,-355)
 ],false,'centripetal',.35);
 roadCurve.arcLengthDivisions=800;
 const roadLength=roadCurve.getLength();
@@ -74,7 +81,7 @@ function reset(){
  speed=0;lateral=2.8;progress=.105;gas=false;braking=false;steer=0;headingOffset=0;collisionCount=0;collisionRecovery=0;hitLock=0;driveDirection=1;throttleResponse=0;playerHeading=headingAt(progress);
  let sameCount=0,oncomingCount=0;traffic.forEach(v=>{if(v.oncoming){v.t=.91-oncomingCount*.105;oncomingCount++;}else{v.t=sameCount===0?.055:sameCount===1?.025:.23+(sameCount-2)*.095;if(sameCount<2){v.homeLane=2.8;v.lane=2.8;}sameCount++;}v.lane=v.lane||v.homeLane;v.targetLane=v.lane;v.overtaking=false;v.passTarget=null;v.laneChangeCooldown=.25+Math.random()*.25;v.cruiseSpeed=randomBetween(v.oncoming?SPEED_SETTINGS.aiOncomingMinKmh:SPEED_SETTINGS.aiSameDirectionMinKmh,v.oncoming?SPEED_SETTINGS.aiOncomingMaxKmh:SPEED_SETTINGS.aiSameDirectionMaxKmh)*KMH_TO_MPS;v.speed=v.cruiseSpeed;v.speedRecovery=0;v.hitCooldown=0;v.aiRecoveryHold=0;v.avoidanceHold=0;v.teleportedThisFrame=true;orientOnCurve(v.mesh,v.t,v.lane);});
  buildings.forEach(item=>{item.t=item.homeT;item.mesh.visible=true;const p=pointAt(item.homeT,item.offset,0);item.mesh.position.set(p.x,item.h/2-.15,p.z);const tangent=roadCurve.getTangentAt(item.homeT);item.mesh.rotation.y=Math.atan2(-tangent.x,-tangent.z)+item.rotationJitter;});
- const spawn=pointAt(progress,lateral,.03);player.position.copy(spawn);playerHeading=headingAt(progress);player.rotation.y=playerHeading;$('speed').textContent='0';$('progress').textContent='11%';$('mission').textContent='Curved road · Keep left · Traffic follows the road';setCheck('checkReset','Reset restores test');showToast('Test reset');
+ const spawn=pointAt(progress,lateral,.03);player.position.copy(spawn);playerHeading=headingAt(progress);player.rotation.y=playerHeading;$('speed').textContent='0';$('progress').textContent='11%';$('mission').textContent='Straight + curved road · Keep left · Traffic follows the road';setCheck('checkReset','Reset restores test');showToast('Test reset');
 }
 function showToast(s){}
 // Swept collision in road-local coordinates. progress/t are arc-length fractions,
@@ -261,7 +268,10 @@ function update(dt){
  $('progress').textContent=Math.round(progress*100)+'%';
  const roadHeading=headingAt(progress);const angleDeg=r=>Math.round(THREE.MathUtils.euclideanModulo(r+Math.PI,Math.PI*2)*180/Math.PI-180);
  $('headingDiag').textContent=angleDeg(playerHeading)+'° / '+angleDeg(roadHeading)+'°';
- if(progress>.45&&progress<.8)$('mission').textContent='Bend active · Traffic stays on road';
+ if(progress>.22&&progress<.42)$('mission').textContent='Right-hand bend · Traffic stays on road';
+  if(progress>.42&&progress<.62)$('mission').textContent='Straight section · Keep left';
+  if(progress>.62&&progress<.82)$('mission').textContent='Left-hand bend · Traffic stays on road';
+  if(progress>.82&&progress<.96)$('mission').textContent='Final straight · Keep left';
  if(progress>=.97){speed=0;$('mission').textContent='End of test segment · RESET to repeat';}
  const forward=new THREE.Vector3(-Math.sin(playerHeading),0,-Math.cos(playerHeading));const p=player.position;
  const desiredCam=p.clone().addScaledVector(forward,-11);desiredCam.y+=5.4;

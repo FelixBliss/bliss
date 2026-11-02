@@ -7,7 +7,7 @@
 @media(min-width:850px){#touch{opacity:.5}.pad button{width:52px;height:52px}#help{bottom:10px}}
 </style></head><body>
 <canvas id="game"></canvas>
-<div id="hud" class="panel"><b>ACCRARIDE · BRANCH ROAD TEST</b><br>Speed: <span id="speed">0</span> km/h<br>Current road: <span id="road">Central Avenue</span><br>Junction: <span id="junction">Approaching</span><br>Traffic: <span id="traffic">0</span><br>Driving: <span id="drivingState">On road</span></div>
+<div id="hud" class="panel"><b>ACCRARIDE · BRANCH ROAD TEST</b><br>Speed: <span id="speed">0</span> km/h<br>Current road: <span id="road">Central Avenue</span><br>Junction: <span id="junction">Approaching</span><br>Traffic: <span id="traffic">0</span><br>Road graph: <span id="graphStatus">Checking…</span><br>Driving: <span id="drivingState">On road</span></div>
 <div id="map" class="panel"><canvas id="mapCanvas" width="300" height="300"></canvas></div><div id="status">Independent test · Production unchanged</div>
 <div id="masterControls"><div id="masterLeft"><div><button id="cameraMode">CAM</button><br><button id="lightsBtn">LIGHTS OFF</button><br><button id="hornBtn">HORN</button><br><button id="resetMaster">RESET</button></div><div id="wheelArea" aria-label="Steering wheel"></div></div><div id="masterRight"><button id="gearBtn">GEAR: D</button><button class="pedal" id="brakeMaster">BRAKE</button><button class="pedal" id="gasMaster">ACCEL</button></div></div><div id="startCover"><div id="startCard"><div style="font-size:36px">🚕</div><h2>AccraRide Road Network</h2><p>Steer through the connected roads. Hold ACCEL to build speed and BRAKE to slow down. Use D/R to change gear.</p><button id="startDrive">START DRIVING</button></div></div><div id="touch"><div class="pad"><button id="left">◀</button><button id="right">▶</button></div><div class="pad"><button id="brake">▼</button><button id="gas">▲</button></div></div>
 <div id="help">WASD / Arrow keys or touch · Follow the connected roads and explore the branches</div>
@@ -74,6 +74,31 @@ for(const x of [-.78,.78]){const lamp=new THREE.Mesh(new THREE.BoxGeometry(.35,.
 const traffic=[];const carMats=[0xd74d3e,0xe0b83f,0xeeeeea,0x334f70,0x4c8065].map(c=>material(c,.48));
 function addTraffic(edge,reverse,t){const group=new THREE.Group(),paint=carMats[Math.floor(Math.random()*carMats.length)];const shell=new THREE.Mesh(new THREE.BoxGeometry(2.1,.85,4),paint);shell.position.y=.75;group.add(shell);const top=new THREE.Mesh(new THREE.BoxGeometry(1.65,.65,1.9),material(0x263944,.25));top.position.set(0,1.45,-.2);group.add(top);const cruise=18+Math.random()*13;const item={group,edge,reverse,t,speed:cruise,baseSpeed:cruise,previousNode:null,lane:1.75,hitCooldown:0,aiRecoveryHold:0,playerCollisionHold:false,previousPosition:new THREE.Vector3()};scene.add(group);traffic.push(item)}
 const adjacency={};for(const edge of edgeData){(adjacency[edge.a]??=[]).push(edge);(adjacency[edge.b]??=[]).push(edge)}
+function validateRoadGraph(){
+ const errors=[],ids=new Set(),nodeIds=new Set(Object.keys(nodes));
+ for(const e of edgeData){if(ids.has(e.id))errors.push('Duplicate edge '+e.id);ids.add(e.id);if(!nodeIds.has(e.a)||!nodeIds.has(e.b))errors.push('Missing endpoint on '+e.id);if(e.a===e.b)errors.push('Self-loop '+e.id);if(!(e.length>0))errors.push('Invalid length '+e.id)}
+ for(const id of nodeIds){if(!adjacency[id]?.length)errors.push('Isolated node '+id)}
+ const start=Object.keys(nodes)[0],seen=new Set([start]),queue=[start];
+ while(queue.length){const n=queue.shift();for(const e of adjacency[n]||[]){const next=e.a===n?e.b:e.a;if(!seen.has(next)){seen.add(next);queue.push(next)}}}
+ for(const id of nodeIds)if(!seen.has(id))errors.push('Disconnected node '+id);
+ return {valid:errors.length===0,nodeCount:nodeIds.size,edgeCount:edgeData.length,errors};
+}
+function findGraphRoute(startNodeId,destinationNodeId){
+ if(!nodes[startNodeId]||!nodes[destinationNodeId])return null;
+ const queue=[startNodeId],previous=new Map([[startNodeId,null]]);
+ while(queue.length){const node=queue.shift();if(node===destinationNodeId)break;
+  for(const edge of adjacency[node]||[]){const next=edge.a===node?edge.b:edge.a;if(!previous.has(next)){previous.set(next,{node,edge,direction:edge.a===node?'forward':'reverse'});queue.push(next)}}
+ }
+ if(!previous.has(destinationNodeId))return null;
+ const steps=[];let cursor=destinationNodeId;
+ while(cursor!==startNodeId){const p=previous.get(cursor);steps.push({edgeId:p.edge.id,fromNodeId:p.node,toNodeId:cursor,direction:p.direction});cursor=p.node}
+ steps.reverse();return {startNodeId,destinationNodeId,steps};
+}
+const graphValidation=validateRoadGraph();
+document.getElementById('graphStatus').textContent=graphValidation.valid?'VALID · '+graphValidation.nodeCount+' nodes / '+graphValidation.edgeCount+' roads':'ERROR · '+graphValidation.errors.length;
+document.getElementById('graphStatus').style.color=graphValidation.valid?'#8ee7a5':'#ff7777';
+if(!graphValidation.valid)console.error('AccraRide road graph validation failed',graphValidation.errors);
+
 for(const r of edgeData){if(['ab','bc','cd','di','eb','bf','cj','ck','en','of','gd','dh','nf','co','al','jl','km','ig','ih'].includes(r.id)){addTraffic(r,false,.2+Math.random()*.6);addTraffic(r,true,.2+Math.random()*.6)}}
 function placeTraffic(v){const t=THREE.MathUtils.clamp(v.t,0,1),p=v.edge.curve.getPointAt(t),tan=v.edge.curve.getTangentAt(t).normalize(),direction=tan.clone().multiplyScalar(v.reverse?-1:1),side=new THREE.Vector3(-direction.z,0,direction.x);v.group.position.set(p.x+side.x*v.lane,0,p.z+side.z*v.lane);v.group.rotation.y=Math.atan2(direction.x,direction.z)}
 function advanceTraffic(v,dt){let remaining=v.speed*dt/v.edge.length*(v.reverse?-1:1),guard=0;while(Math.abs(remaining)>0&&guard++<4){const next=v.t+remaining;if(next>=.985||next<=.015){const atB=next>=.985,node=atB?v.edge.b:v.edge.a;v.previousNode=node;const choices=(adjacency[node]||[]).filter(e=>e.id!==v.edge.id);if(!choices.length){v.reverse=!v.reverse;v.t=atB?.97:.03;remaining=0;break}const pick=choices[Math.floor(Math.random()*choices.length)];v.edge=pick;v.reverse=pick.b===node;v.t=v.reverse?.985:.015;remaining*=.65;}else{v.t=next;remaining=0}}placeTraffic(v)}

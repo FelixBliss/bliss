@@ -7,10 +7,10 @@
 @media(min-width:850px){#touch{opacity:.5}.pad button{width:52px;height:52px}#help{bottom:10px}}
 </style></head><body>
 <canvas id="game"></canvas>
-<div id="hud" class="panel"><b>ACCRARIDE · BRANCH ROAD TEST</b><br>Speed: <span id="speed">0</span> km/h<br>Current road: <span id="road">Central Avenue</span><br>Junction: <span id="junction">Approaching</span><br>Traffic: <span id="traffic">0</span><br>Road graph: <span id="graphStatus">Checking…</span><br>Driving: <span id="drivingState">On road</span></div>
-<div id="map" class="panel"><canvas id="mapCanvas" width="300" height="300"></canvas></div><div id="status">Independent test · Production unchanged</div>
-<div id="masterControls"><div id="masterLeft"><div><button id="cameraMode">CAM</button><br><button id="lightsBtn">LIGHTS OFF</button><br><button id="hornBtn">HORN</button><br><button id="resetMaster">RESET</button></div><div id="wheelArea" aria-label="Steering wheel"></div></div><div id="masterRight"><button id="gearBtn">GEAR: D</button><button class="pedal" id="brakeMaster">BRAKE</button><button class="pedal" id="gasMaster">ACCEL</button></div></div><div id="startCover"><div id="startCard"><div style="font-size:36px">🚕</div><h2>AccraRide Road Network</h2><p>Steer through the connected roads. Hold ACCEL to build speed and BRAKE to slow down. Use D/R to change gear.</p><button id="startDrive">START DRIVING</button></div></div><div id="touch"><div class="pad"><button id="left">◀</button><button id="right">▶</button></div><div class="pad"><button id="brake">▼</button><button id="gas">▲</button></div></div>
-<div id="help">WASD / Arrow keys or touch · Follow the connected roads and explore the branches</div>
+<div id="hud" class="panel"><b>ACCRARIDE · CENTRAL ACCRA</b><br>Speed: <span id="speed">0</span> km/h<br>Current road: <span id="road">Circle approach</span><br>Junction: <span id="junction">Approaching</span><br>Traffic: <span id="traffic">0</span><br>Road graph: <span id="graphStatus">Checking…</span><br>Driving: <span id="drivingState">On road</span></div>
+<div id="map" class="panel"><canvas id="mapCanvas" width="300" height="300"></canvas></div><div id="status">Central Accra schematic · Preview only</div>
+<div id="masterControls"><div id="masterLeft"><div><button id="cameraMode">CAM</button><br><button id="lightsBtn">LIGHTS OFF</button><br><button id="hornBtn">HORN</button><br><button id="resetMaster">RESET</button></div><div id="wheelArea" aria-label="Steering wheel"></div></div><div id="masterRight"><button id="gearBtn">GEAR: D</button><button class="pedal" id="brakeMaster">BRAKE</button><button class="pedal" id="gasMaster">ACCEL</button></div></div><div id="startCover"><div id="startCard"><div style="font-size:36px">🚕</div><h2>AccraRide · Central Accra</h2><p>Steer through the connected roads. Hold ACCEL to build speed and BRAKE to slow down. Use D/R to change gear.</p><button id="startDrive">START DRIVING</button></div></div><div id="touch"><div class="pad"><button id="left">◀</button><button id="right">▶</button></div><div class="pad"><button id="brake">▼</button><button id="gas">▲</button></div></div>
+<div id="help">WASD / Arrow keys or touch · Central Accra · simplified road layout</div>
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 const scene=new THREE.Scene();scene.background=new THREE.Color(0xa9cbd8);scene.fog=new THREE.Fog(0xa9cbd8,260,760);
@@ -20,19 +20,46 @@ scene.add(new THREE.HemisphereLight(0xeaf7ff,0x52634c,1.8));const sun=new THREE.
 const material=(c,r=.9)=>new THREE.MeshStandardMaterial({color:c,roughness:r});
 const ground=new THREE.Mesh(new THREE.PlaneGeometry(1400,1400),material(0x738b68));ground.rotation.x=-Math.PI/2;ground.position.y=-.22;scene.add(ground);
 const asphalt=material(0x30363b),lanePaint=material(0xe7e0c8),curb=material(0xc6c5b9),concrete=material(0x777d7b);
-const nodes={A:[0,0,145],B:[0,0,35],C:[0,0,-85],D:[0,0,-205],E:[-125,0,35],F:[125,0,35],G:[-125,0,-205],H:[125,0,-205],I:[0,0,-330],J:[-230,0,-85],K:[230,0,-85],L:[-230,0,155],M:[230,0,155],N:[-125,0,-85],O:[125,0,-85]};
+// Simplified Central Accra road graph. Coordinates are gameplay-scaled, not survey-grade GIS.
+const nodes={
+ A:[0,0,0],       // Kwame Nkrumah Circle
+ B:[-160,0,20],   // Kaneshie
+ C:[-80,0,105],   // Obetsebi Lamptey Interchange
+ D:[125,0,160],   // Accra Central
+ E:[35,0,85],     // Adabraka
+ F:[-20,0,-110],  // Nsawam Road / Nima junction
+ G:[20,0,-270],   // Achimota
+ H:[-150,0,-320], // Lapaz direction
+ I:[155,0,-80],   // Ako Adjei / 37 area
+ J:[245,0,100],   // Osu
+ K:[-250,0,130],  // Abossey Okai
+ L:[-300,0,-45],  // Mataheko
+ M:[-105,0,-205], // Nima
+ N:[280,0,-245],  // Airport direction
+ O:[175,0,-325]   // Tetteh Quarshie direction
+};
 const roads=[
-{id:'ab',a:'A',b:'B',name:'Central Avenue',via:[[0,0,90]]},{id:'bc',a:'B',b:'C',name:'Central Avenue',via:[[0,0,-20]]},{id:'cd',a:'C',b:'D',name:'Ring Connector',via:[[4,0,-145]]},{id:'di',a:'D',b:'I',name:'Central Avenue',via:[[0,0,-270]]},
-{id:'eb',a:'E',b:'B',name:'West Branch',via:[[-65,0,35]]},{id:'bf',a:'B',b:'F',name:'East Branch',via:[[65,0,35]]},{id:'gd',a:'G',b:'D',name:'Northwest Link',via:[[-65,0,-205]]},{id:'dh',a:'D',b:'H',name:'Northeast Link',via:[[65,0,-205]]},
-{id:'cj',a:'C',b:'J',name:'West Connector',via:[[-120,0,-85]]},{id:'ck',a:'C',b:'K',name:'East Connector',via:[[120,0,-85]]},
-{id:'en',a:'E',b:'N',name:'West Avenue',via:[[-125,0,-25]]},{id:'nf',a:'N',b:'C',name:'West Avenue',via:[[-65,0,-85]]},{id:'co',a:'C',b:'O',name:'East Avenue',via:[[65,0,-85]]},{id:'of',a:'O',b:'F',name:'East Avenue',via:[[125,0,-25]]},
-{id:'el',a:'E',b:'L',name:'Outer West Road',via:[[-190,0,95]]},{id:'fm',a:'F',b:'M',name:'Outer East Road',via:[[190,0,95]]},
-// End connectors: close the previously dead-end road arms into continuous loops
-{id:'al',a:'A',b:'L',name:'Southwest Loop',via:[[-65,0,190],[-175,0,190]]},
-{id:'jl',a:'J',b:'L',name:'West Outer Loop',via:[[-280,0,-20],[-280,0,80]]},
-{id:'km',a:'K',b:'M',name:'East Outer Loop',via:[[280,0,-20],[280,0,80]]},
-{id:'ig',a:'I',b:'G',name:'Northwest Outer Loop',via:[[-90,0,-390]]},
-{id:'ih',a:'I',b:'H',name:'Northeast Outer Loop',via:[[90,0,-390]]}
+ {id:'ab',a:'A',b:'B',name:'Ring Road West',via:[[-75,0,8]]},
+ {id:'bc',a:'B',b:'C',name:'Kaneshie–Obetsebi Link',via:[[-145,0,75]]},
+ {id:'ca',a:'C',b:'A',name:'Obetsebi Lamptey Interchange',via:[[-35,0,70]]},
+ {id:'ae',a:'A',b:'E',name:'Kwame Nkrumah Avenue',via:[[8,0,45]]},
+ {id:'ed',a:'E',b:'D',name:'Kwame Nkrumah Avenue',via:[[85,0,120]]},
+ {id:'dj',a:'D',b:'J',name:'Accra Central–Osu Connector',via:[[190,0,165]]},
+ {id:'af',a:'A',b:'F',name:'Nsawam Road',via:[[-8,0,-55]]},
+ {id:'fg',a:'F',b:'G',name:'Nsawam Road · Achimota',via:[[5,0,-190]]},
+ {id:'gh',a:'G',b:'H',name:'Achimota–Lapaz Road',via:[[-70,0,-300]]},
+ {id:'fm',a:'F',b:'M',name:'Nima Road',via:[[-70,0,-155]]},
+ {id:'mg',a:'M',b:'G',name:'Nima–Achimota Connector',via:[[-40,0,-245]]},
+ {id:'ai',a:'A',b:'I',name:'Ring Road Central',via:[[85,0,-25]]},
+ {id:'ij',a:'I',b:'J',name:'Ring Road Central · Osu',via:[[205,0,5]]},
+ {id:'id',a:'I',b:'D',name:'Adabraka–Accra Central Link',via:[[150,0,65]]},
+ {id:'ck',a:'C',b:'K',name:'Abossey Okai Road',via:[[-170,0,125]]},
+ {id:'kl',a:'K',b:'L',name:'Abossey Okai–Mataheko Road',via:[[-290,0,45]]},
+ {id:'lb',a:'L',b:'B',name:'Kaneshie West Connector',via:[[-235,0,-10]]},
+ {id:'fi',a:'F',b:'I',name:'Ako Adjei Interchange Link',via:[[75,0,-100]]},
+ {id:'in',a:'I',b:'N',name:'Liberation Road · Airport',via:[[230,0,-155]]},
+ {id:'no',a:'N',b:'O',name:'Airport–Tetteh Quarshie Link',via:[[235,0,-300]]},
+ {id:'og',a:'O',b:'G',name:'Tetteh Quarshie–Achimota Link',via:[[85,0,-350]]}
 ];
 const edgeData=[];
 function makeRoad(r){const pts=[new THREE.Vector3(...nodes[r.a]),...(r.via||[]).map(p=>new THREE.Vector3(...p)),new THREE.Vector3(...nodes[r.b])];const curve=new THREE.CatmullRomCurve3(pts,false,'centripetal');edgeData.push({...r,curve,length:curve.getLength()});
@@ -70,7 +97,7 @@ for(const [id,p] of Object.entries(nodes)){const island=new THREE.Mesh(new THREE
 for(let x=-300;x<=300;x+=60){for(const z of [-410,245]){const wall=new THREE.Mesh(new THREE.BoxGeometry(42,.45,.55),material(0x8d9188));wall.position.set(x,.22,z);scene.add(wall)}}
 // Player vehicle, facing down the main avenue
 const car=new THREE.Group();const body=new THREE.Mesh(new THREE.BoxGeometry(2.35,.9,4.5),material(0x087ca8,.4));body.position.y=.85;body.castShadow=true;car.add(body);const cabin=new THREE.Mesh(new THREE.BoxGeometry(1.82,.82,2.15),material(0x172b37,.25));cabin.position.set(0,1.65,-.25);car.add(cabin);const bumper=new THREE.Mesh(new THREE.BoxGeometry(2.1,.22,.2),material(0xe7e4d5));bumper.position.set(0,.65,-2.28);car.add(bumper);
-for(const x of [-.78,.78]){const lamp=new THREE.Mesh(new THREE.BoxGeometry(.35,.18,.08),material(0xfff2c7));lamp.position.set(x,1.02,-2.28);car.add(lamp)}car.position.set(0,0,112);scene.add(car);
+for(const x of [-.78,.78]){const lamp=new THREE.Mesh(new THREE.BoxGeometry(.35,.18,.08),material(0xfff2c7));lamp.position.set(x,1.02,-2.28);car.add(lamp)}car.position.set(0,0,28);scene.add(car);
 const traffic=[];const carMats=[0xd74d3e,0xe0b83f,0xeeeeea,0x334f70,0x4c8065].map(c=>material(c,.48));
 function addTraffic(edge,reverse,t){const group=new THREE.Group(),paint=carMats[Math.floor(Math.random()*carMats.length)];const shell=new THREE.Mesh(new THREE.BoxGeometry(2.1,.85,4),paint);shell.position.y=.75;group.add(shell);const top=new THREE.Mesh(new THREE.BoxGeometry(1.65,.65,1.9),material(0x263944,.25));top.position.set(0,1.45,-.2);group.add(top);const cruise=18+Math.random()*13;const item={group,edge,reverse,t,speed:cruise,baseSpeed:cruise,previousNode:null,lane:1.75,hitCooldown:0,aiRecoveryHold:0,playerCollisionHold:false,previousPosition:new THREE.Vector3()};scene.add(group);traffic.push(item)}
 const adjacency={};for(const edge of edgeData){(adjacency[edge.a]??=[]).push(edge);(adjacency[edge.b]??=[]).push(edge)}
@@ -126,7 +153,7 @@ for(const v of traffic){const dx=car.position.x-v.group.position.x,dz=car.positi
 collisionFlash=Math.max(0,collisionFlash-dt);
 const camBack=cameraMode===1?9:cameraMode===2?20:14,camHeight=cameraMode===1?5.5:cameraMode===2?14:8.5;const desired=new THREE.Vector3(car.position.x+Math.sin(heading)*camBack,camHeight,car.position.z+Math.cos(heading)*camBack);camera.position.lerp(desired,1-Math.exp(-3.2*dt));camera.lookAt(car.position.x-Math.sin(heading)*8,1.6,car.position.z-Math.cos(heading)*8);
 let junction='No junction nearby',junctionDist=Infinity;for(const [id,p] of Object.entries(nodes)){const d=Math.hypot(car.position.x-p[0],car.position.z-p[2]);if(d<junctionDist){junctionDist=d;junction=id}}if(junctionDist>38)junction='No junction nearby';else junction='Junction '+junction+' · '+Math.round(junctionDist)+' m';
-document.getElementById('speed').textContent=Math.round(Math.abs(speed));document.getElementById('road').textContent=info.distance<20?info.road.name:'Off road';document.getElementById('junction').textContent=junction;document.getElementById('traffic').textContent=traffic.length;document.getElementById('drivingState').textContent=collisionFlash>0?'Collision':offRoad?'Off road':'On road';document.getElementById('status').textContent=collisionFlash>0?'Collision · speed reduced':offRoad?'Off road · reduced traction':'Master + curved rules · Preview only';drawMap();renderer.render(scene,camera)}
+document.getElementById('speed').textContent=Math.round(Math.abs(speed));document.getElementById('road').textContent=info.distance<20?info.road.name:'Off road';document.getElementById('junction').textContent=junction;document.getElementById('traffic').textContent=traffic.length;document.getElementById('drivingState').textContent=collisionFlash>0?'Collision':offRoad?'Off road':'On road';document.getElementById('status').textContent=collisionFlash>0?'Collision · speed reduced':offRoad?'Off road · reduced traction':'Central Accra road graph · Preview only';drawMap();renderer.render(scene,camera)}
 // Master-style touch steering, pedals, D/R, camera, lights, horn and reset.
 const wheelArea=document.getElementById('wheelArea');wheelArea.addEventListener('pointerdown',e=>{e.preventDefault();steerTouch=e.pointerId;lastSteerX=e.clientX;wheelArea.setPointerCapture(e.pointerId)});wheelArea.addEventListener('pointermove',e=>{if(steerTouch!==e.pointerId)return;steer=THREE.MathUtils.clamp(steer+(e.clientX-lastSteerX)/65,-1,1);lastSteerX=e.clientX});function releaseSteer(e){if(steerTouch!==e.pointerId)return;steerTouch=null;steer=0}wheelArea.addEventListener('pointerup',releaseSteer);wheelArea.addEventListener('pointercancel',releaseSteer);
 function holdButton(id,setter){const el=document.getElementById(id);const on=e=>{e.preventDefault();setter(true);el.setPointerCapture?.(e.pointerId)};const off=()=>setter(false);el.addEventListener('pointerdown',on);['pointerup','pointercancel','pointerleave'].forEach(n=>el.addEventListener(n,off))}
@@ -135,7 +162,7 @@ document.getElementById('gearBtn').onclick=()=>{if(speed>3){document.getElementB
 document.getElementById('cameraMode').onclick=()=>{cameraMode=(cameraMode+1)%3;document.getElementById('cameraMode').textContent=['CAM: CHASE','CAM: CLOSE','CAM: HIGH'][cameraMode]};
 document.getElementById('lightsBtn').onclick=()=>{lightsOn=!lightsOn;document.getElementById('lightsBtn').textContent=lightsOn?'LIGHTS ON':'LIGHTS OFF'};
 document.getElementById('hornBtn').onclick=()=>{document.getElementById('status').textContent='Horn pressed'};
-document.getElementById('resetMaster').onclick=()=>{speed=0;heading=0;steer=0;gasHeld=false;brakeHeld=false;throttleResponse=0;collisionRecovery=0;driveReverse=false;document.getElementById('gearBtn').textContent='GEAR: D';car.position.set(0,0,112)};
+document.getElementById('resetMaster').onclick=()=>{speed=0;heading=0;steer=0;gasHeld=false;brakeHeld=false;throttleResponse=0;collisionRecovery=0;driveReverse=false;document.getElementById('gearBtn').textContent='GEAR: D';car.position.set(0,0,28)};
 document.getElementById('startDrive').onclick=()=>{activeDrive=true;document.getElementById('startCover').style.display='none'};
 tick();addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
 </script></body></html>

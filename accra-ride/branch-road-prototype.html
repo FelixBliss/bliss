@@ -26,7 +26,13 @@ const roads=[
 {id:'eb',a:'E',b:'B',name:'West Branch',via:[[-65,0,35]]},{id:'bf',a:'B',b:'F',name:'East Branch',via:[[65,0,35]]},{id:'gd',a:'G',b:'D',name:'Northwest Link',via:[[-65,0,-205]]},{id:'dh',a:'D',b:'H',name:'Northeast Link',via:[[65,0,-205]]},
 {id:'cj',a:'C',b:'J',name:'West Connector',via:[[-120,0,-85]]},{id:'ck',a:'C',b:'K',name:'East Connector',via:[[120,0,-85]]},
 {id:'en',a:'E',b:'N',name:'West Avenue',via:[[-125,0,-25]]},{id:'nf',a:'N',b:'C',name:'West Avenue',via:[[-65,0,-85]]},{id:'co',a:'C',b:'O',name:'East Avenue',via:[[65,0,-85]]},{id:'of',a:'O',b:'F',name:'East Avenue',via:[[125,0,-25]]},
-{id:'el',a:'E',b:'L',name:'Outer West Road',via:[[-190,0,95]]},{id:'fm',a:'F',b:'M',name:'Outer East Road',via:[[190,0,95]]}
+{id:'el',a:'E',b:'L',name:'Outer West Road',via:[[-190,0,95]]},{id:'fm',a:'F',b:'M',name:'Outer East Road',via:[[190,0,95]]},
+// End connectors: close the previously dead-end road arms into continuous loops
+{id:'al',a:'A',b:'L',name:'Southwest Loop',via:[[-65,0,190],[-175,0,190]]},
+{id:'jl',a:'J',b:'L',name:'West Outer Loop',via:[[-280,0,-20],[-280,0,80]]},
+{id:'km',a:'K',b:'M',name:'East Outer Loop',via:[[280,0,-20],[280,0,80]]},
+{id:'ig',a:'I',b:'G',name:'Northwest Outer Loop',via:[[-90,0,-390]]},
+{id:'ih',a:'I',b:'H',name:'Northeast Outer Loop',via:[[90,0,-390]]}
 ];
 const edgeData=[];
 function makeRoad(r){const pts=[new THREE.Vector3(...nodes[r.a]),...(r.via||[]).map(p=>new THREE.Vector3(...p)),new THREE.Vector3(...nodes[r.b])];const curve=new THREE.CatmullRomCurve3(pts,false,'centripetal');edgeData.push({...r,curve,length:curve.getLength()});
@@ -50,7 +56,7 @@ for(const x of [-.78,.78]){const lamp=new THREE.Mesh(new THREE.BoxGeometry(.35,.
 const traffic=[];const carMats=[0xd74d3e,0xe0b83f,0xeeeeea,0x334f70,0x4c8065].map(c=>material(c,.48));
 function addTraffic(edge,reverse,t){const group=new THREE.Group(),paint=carMats[Math.floor(Math.random()*carMats.length)];const shell=new THREE.Mesh(new THREE.BoxGeometry(2.1,.85,4),paint);shell.position.y=.75;group.add(shell);const top=new THREE.Mesh(new THREE.BoxGeometry(1.65,.65,1.9),material(0x263944,.25));top.position.set(0,1.45,-.2);group.add(top);const cruise=18+Math.random()*13;const item={group,edge,reverse,t,speed:cruise,baseSpeed:cruise,previousNode:null,lane:1.75,hitCooldown:0};scene.add(group);traffic.push(item)}
 const adjacency={};for(const edge of edgeData){(adjacency[edge.a]??=[]).push(edge);(adjacency[edge.b]??=[]).push(edge)}
-for(const r of edgeData){if(['ab','bc','cd','di','eb','bf','cj','ck','en','of','gd','dh','nf','co'].includes(r.id)){addTraffic(r,false,.2+Math.random()*.6);addTraffic(r,true,.2+Math.random()*.6)}}
+for(const r of edgeData){if(['ab','bc','cd','di','eb','bf','cj','ck','en','of','gd','dh','nf','co','al','jl','km','ig','ih'].includes(r.id)){addTraffic(r,false,.2+Math.random()*.6);addTraffic(r,true,.2+Math.random()*.6)}}
 function placeTraffic(v){const t=THREE.MathUtils.clamp(v.t,0,1),p=v.edge.curve.getPointAt(t),tan=v.edge.curve.getTangentAt(t).normalize(),direction=tan.clone().multiplyScalar(v.reverse?-1:1),side=new THREE.Vector3(-direction.z,0,direction.x);v.group.position.set(p.x+side.x*v.lane,0,p.z+side.z*v.lane);v.group.rotation.y=Math.atan2(direction.x,direction.z)}
 function advanceTraffic(v,dt){let remaining=v.speed*dt/v.edge.length*(v.reverse?-1:1),guard=0;while(Math.abs(remaining)>0&&guard++<4){const next=v.t+remaining;if(next>=.985||next<=.015){const atB=next>=.985,node=atB?v.edge.b:v.edge.a;v.previousNode=node;const choices=(adjacency[node]||[]).filter(e=>e.id!==v.edge.id);if(!choices.length){v.reverse=!v.reverse;v.t=atB?.97:.03;remaining=0;break}const pick=choices[Math.floor(Math.random()*choices.length)];v.edge=pick;v.reverse=pick.b===node;v.t=v.reverse?.985:.015;remaining*=.65;}else{v.t=next;remaining=0}}placeTraffic(v)}
 traffic.forEach(placeTraffic);

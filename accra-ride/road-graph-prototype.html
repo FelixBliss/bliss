@@ -152,9 +152,18 @@ function collide(previousPlayer){
    // the traffic vehicle along the road, and briefly lock throttle after impact.
    // Do not snap the independently-steered player back onto the road centreline.
    const wasAhead=v.previousT>previousPlayer.progress;
-   const separation=3.25/roadLength;
-   v.t=THREE.MathUtils.clamp(progress+(wasAhead?separation:-separation),.025,.975);
-   v.lane=v.previousLane;
+   // Move the struck AI decisively clear of the player. Keep it on the road
+   // and inside the active segment so a collision can never trigger recycling.
+   const separation=8.5/roadLength;
+   const escapeLane=v.homeLane===2.8?5.7:2.8;
+   const playerLaneAtImpact=previousPlayer.lateral;
+   const canUseEscapeLane=Math.abs(playerLaneAtImpact-escapeLane)>2.0 &&
+     !traffic.some(other=>other!==v&&!other.oncoming&&Math.abs(other.lane-escapeLane)<1.2&&Math.abs(other.t-v.t)*roadLength<10);
+   v.t=THREE.MathUtils.clamp(progress+(wasAhead?separation:-separation),.04,.96);
+   v.lane=canUseEscapeLane?escapeLane:v.previousLane;
+   v.targetLane=v.lane;
+   v.overtaking=false;v.passTarget=null;
+   v.avoidanceHold=1.4;
    orientOnCurve(v.mesh,v.t,v.lane);
    // Match master behavior: a same-direction vehicle striking from behind
    // takes the speed penalty; the player keeps moving. Other impacts slow the player.
@@ -187,14 +196,19 @@ function collide(previousPlayer){
     {progress:b.previousT,lateral:b.previousLane},
     {progress:b.t,lateral:b.lane}
    )){
-    const gap=10/roadLength;
+    const gap=8.5/roadLength;
     const aWasAhead=a.previousT>=b.previousT;
     const front=aWasAhead?a:b,rear=aWasAhead?b:a;
-    rear.t=THREE.MathUtils.clamp(front.t-gap,.025,.975);rear.lane=rear.previousLane;
+    // Separate only the following vehicle, with a stable lane escape. Do not
+    // push either vehicle beyond the road segment where normal recycling occurs.
+    rear.t=THREE.MathUtils.clamp(front.t-gap,.04,.96);
+    const escapeLane=rear.homeLane===2.8?5.7:2.8;
+    const escapeClear=!traffic.some(other=>other!==rear&&other!==front&&Math.abs(other.lane-escapeLane)<1.2&&Math.abs(other.t-rear.t)*roadLength<10);
+    rear.lane=escapeClear?escapeLane:rear.previousLane;
+    rear.targetLane=rear.lane;rear.overtaking=false;rear.passTarget=null;
     if(rear.hitCooldown<=0){
      rear.speed=Math.max(5*KMH_TO_MPS,rear.speed*.48);
-     rear.aiRecoveryHold=1.4;rear.hitCooldown=1.8;rear.avoidanceHold=1.3;
-     rear.targetLane=rear.homeLane===2.8?5.7:2.8;
+     rear.aiRecoveryHold=1.4;rear.hitCooldown=1.8;rear.avoidanceHold=1.5;
      showToast('Traffic collision — following AI slowed');
     }
     orientOnCurve(front.mesh,front.t,front.lane);orientOnCurve(rear.mesh,rear.t,rear.lane);

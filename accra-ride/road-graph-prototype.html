@@ -155,12 +155,14 @@ function collide(previousPlayer){
    // Move the struck AI decisively clear of the player. Keep it on the road
    // and inside the active segment so a collision can never trigger recycling.
    const separation=8.5/roadLength;
+   // Oncoming traffic must remain in its opposing lane. Only same-direction
+   // traffic may use the adjacent lane to escape a player collision.
    const escapeLane=v.homeLane===2.8?5.7:2.8;
    const playerLaneAtImpact=previousPlayer.lateral;
-   const canUseEscapeLane=Math.abs(playerLaneAtImpact-escapeLane)>2.0 &&
+   const canUseEscapeLane=!v.oncoming&&Math.abs(playerLaneAtImpact-escapeLane)>2.0 &&
      !traffic.some(other=>other!==v&&!other.oncoming&&Math.abs(other.lane-escapeLane)<1.2&&Math.abs(other.t-v.t)*roadLength<10);
-   v.t=THREE.MathUtils.clamp(progress+(wasAhead?separation:-separation),.04,.96);
-   v.lane=canUseEscapeLane?escapeLane:v.previousLane;
+   v.t=THREE.MathUtils.clamp(progress+(wasAhead?separation:-separation),.025,.975);
+   v.lane=canUseEscapeLane?escapeLane:v.homeLane;
    v.targetLane=v.lane;
    v.overtaking=false;v.passTarget=null;
    v.avoidanceHold=1.4;
@@ -203,8 +205,10 @@ function collide(previousPlayer){
     // push either vehicle beyond the road segment where normal recycling occurs.
     rear.t=THREE.MathUtils.clamp(front.t-gap,.04,.96);
     const escapeLane=rear.homeLane===2.8?5.7:2.8;
-    const escapeClear=!traffic.some(other=>other!==rear&&other!==front&&Math.abs(other.lane-escapeLane)<1.2&&Math.abs(other.t-rear.t)*roadLength<10);
-    rear.lane=escapeClear?escapeLane:rear.previousLane;
+    const sameDirectionPair=rear.oncoming===front.oncoming;
+    const escapeClear=sameDirectionPair&&!rear.oncoming&&!traffic.some(other=>other!==rear&&other!==front&&!other.oncoming&&Math.abs(other.lane-escapeLane)<1.2&&Math.abs(other.t-rear.t)*roadLength<10);
+    // Never send oncoming traffic across the median or into the player's lane.
+    rear.lane=escapeClear?escapeLane:rear.homeLane;
     rear.targetLane=rear.lane;rear.overtaking=false;rear.passTarget=null;
     if(rear.hitCooldown<=0){
      rear.speed=Math.max(5*KMH_TO_MPS,rear.speed*.48);
@@ -285,8 +289,10 @@ function update(dt){
    v.lane+=THREE.MathUtils.clamp(v.targetLane-v.lane,-dt*2.5,dt*2.5);
    v.t+=v.speed*dt/roadLength;
   }else v.t-=v.speed*dt/roadLength;
-  if(v.t>.985){v.t=.12+Math.random()*.08;v.lane=v.homeLane;v.targetLane=v.homeLane;v.overtaking=false;v.passTarget=null;v.teleportedThisFrame=true;}
-  if(v.t<.02){v.t=.9+Math.random()*.06;v.lane=v.homeLane;v.targetLane=v.homeLane;v.overtaking=false;v.passTarget=null;v.teleportedThisFrame=true;}
+  // Hold vehicles at the test-road endpoints. Recycling is handled only
+  // after the player has passed them and they are well outside the camera view.
+  if(v.t>.985){v.t=.985;v.speed=0;}
+  if(v.t<.02){v.t=.02;v.speed=0;}
   orientOnCurve(v.mesh,v.t,v.lane);
  }
  // Recycle roadside buildings after they fall behind, placing them farther along the same curve.
@@ -304,6 +310,21 @@ function update(dt){
  const desiredCam=p.clone().addScaledVector(forward,-11);desiredCam.y+=5.4;
  camera.position.lerp(desiredCam,Math.min(1,dt*4.2));
  const look=p.clone().addScaledVector(forward,11);look.y+=1.0;camera.lookAt(look);
+ // Recycle only cars physically far behind the player AND outside the camera
+ // frustum. This prevents visible or nearby traffic popping out after impacts.
+ camera.updateMatrixWorld();
+ const viewProjection=new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse);
+ const cameraFrustum=new THREE.Frustum().setFromProjectionMatrix(viewProjection);
+ for(const v of traffic){
+  const behindMetres=(progress-v.t)*roadLength;
+  if(behindMetres>85&&!cameraFrustum.containsPoint(v.mesh.position)){
+   v.t=THREE.MathUtils.clamp(progress+.62,.04,.96);
+   v.lane=v.homeLane;v.targetLane=v.homeLane;v.speed=v.cruiseSpeed;
+   v.aiRecoveryHold=0;v.hitCooldown=0;v.avoidanceHold=0;
+   v.overtaking=false;v.passTarget=null;v.teleportedThisFrame=true;
+   orientOnCurve(v.mesh,v.t,v.lane);
+  }
+ }
 }
 function frame(now){requestAnimationFrame(frame);const dt=Math.min(.035,Math.max(.001,(now-last)/1000));last=now;if(active)update(dt);renderer.render(scene,camera);}
 requestAnimationFrame(frame);

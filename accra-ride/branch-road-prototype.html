@@ -13,9 +13,9 @@
 <div id="help">WASD / Arrow keys or touch · Follow the connected roads and explore the branches</div>
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
-const scene=new THREE.Scene();scene.background=new THREE.Color(0x9fc6d5);scene.fog=new THREE.Fog(0x9fc6d5,220,680);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0xa9cbd8);scene.fog=new THREE.Fog(0xa9cbd8,260,760);
 const camera=new THREE.PerspectiveCamera(62,innerWidth/innerHeight,.1,1200);
-const renderer=new THREE.WebGLRenderer({canvas:document.getElementById('game'),antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,1.6));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;
+const renderer=new THREE.WebGLRenderer({canvas:document.getElementById('game'),antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,1.6));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.08;
 scene.add(new THREE.HemisphereLight(0xeaf7ff,0x52634c,1.8));const sun=new THREE.DirectionalLight(0xffffff,2.1);sun.position.set(-100,160,90);sun.castShadow=true;scene.add(sun);
 const material=(c,r=.9)=>new THREE.MeshStandardMaterial({color:c,roughness:r});
 const ground=new THREE.Mesh(new THREE.PlaneGeometry(1400,1400),material(0x738b68));ground.rotation.x=-Math.PI/2;ground.position.y=-.22;scene.add(ground);
@@ -37,6 +37,11 @@ const roads=[
 const edgeData=[];
 function makeRoad(r){const pts=[new THREE.Vector3(...nodes[r.a]),...(r.via||[]).map(p=>new THREE.Vector3(...p)),new THREE.Vector3(...nodes[r.b])];const curve=new THREE.CatmullRomCurve3(pts,false,'centripetal');edgeData.push({...r,curve,length:curve.getLength()});
 const samples=curve.getPoints(Math.max(24,Math.ceil(curve.getLength()/5))),verts=[],indices=[];
+ // Wide compacted shoulders beneath the asphalt create a finished road profile.
+ const shoulderVerts=[],shoulderIndices=[];
+ for(let i=0;i<samples.length;i++){const tangent=curve.getTangent(i/(samples.length-1)).normalize(),side=new THREE.Vector3(-tangent.z,0,tangent.x).normalize();for(const offset of [-8.4,8.4]){const p=samples[i].clone().addScaledVector(side,offset);p.y=-.035;shoulderVerts.push(p.x,p.y,p.z)}}
+ for(let i=0;i<samples.length-1;i++){const n=i*2;shoulderIndices.push(n,n+2,n+1,n+1,n+2,n+3)}
+ const sg=new THREE.BufferGeometry();sg.setAttribute('position',new THREE.Float32BufferAttribute(shoulderVerts,3));sg.setIndex(shoulderIndices);sg.computeVertexNormals();const shoulder=new THREE.Mesh(sg,material(0xaaa99b));shoulder.receiveShadow=true;scene.add(shoulder);
 for(let i=0;i<samples.length;i++){const tangent=curve.getTangent(i/(samples.length-1)).normalize(),side=new THREE.Vector3(-tangent.z,0,tangent.x).normalize();for(const offset of [-6.2,6.2]){const p=samples[i].clone().addScaledVector(side,offset);p.y=.025;verts.push(p.x,p.y,p.z)}}
 for(let i=0;i<samples.length-1;i++){const n=i*2;indices.push(n,n+2,n+1,n+1,n+2,n+3)}
 const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));geo.setIndex(indices);geo.computeVertexNormals();const roadMesh=new THREE.Mesh(geo,asphalt);roadMesh.receiveShadow=true;scene.add(roadMesh);
@@ -50,6 +55,19 @@ for(const [id,p] of Object.entries(nodes)){const pad=new THREE.Mesh(new THREE.Bo
 // Urban blocks placed away from the road corridors
 const buildingColors=[0xc7b49d,0xb8c5c7,0xd0a77e,0x9eafb1,0xb8aa92];
 for(let x=-290;x<=290;x+=34)for(let z=-360;z<=210;z+=34){let clear=false;for(const r of edgeData){const samples=r.curve.getPoints(12);for(let i=0;i<samples.length-1;i++){const a=samples[i],b=samples[i+1],dx=b.x-a.x,dz=b.z-a.z,t=THREE.MathUtils.clamp(((x-a.x)*dx+(z-a.z)*dz)/(dx*dx+dz*dz||1),0,1);if(Math.hypot(x-(a.x+t*dx),z-(a.z+t*dz))<17){clear=true;break}}if(clear)break}if(clear||Math.random()<.16)continue;const h=9+Math.random()*25,w=10+Math.random()*10;const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,12+Math.random()*8),material(buildingColors[Math.floor(Math.random()*buildingColors.length)]));b.position.set(x,h/2,z);b.castShadow=true;scene.add(b)}
+// Streetscape dressing: footpaths, kerbs, streetlights, trees and small roadside details.
+const sidewalkMat=material(0xc1bdb0),kerbMat=material(0xe0d9c9),trunkMat=material(0x594331),leafMats=[0x47734c,0x5c8754,0x78945b].map(c=>material(c));
+function addTree(x,z,scale=1){const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.22*scale,.32*scale,2.4*scale,7),trunkMat);trunk.position.set(x,1.2*scale,z);trunk.castShadow=true;scene.add(trunk);const crown=new THREE.Mesh(new THREE.SphereGeometry(1.8*scale,9,7),leafMats[Math.floor(Math.random()*leafMats.length)]);crown.position.set(x,3.1*scale,z);crown.scale.set(1,1.15,.95);crown.castShadow=true;scene.add(crown)}
+function addStreetlight(x,z,rot=0){const pole=new THREE.Mesh(new THREE.CylinderGeometry(.09,.13,7,7),material(0x4a5355));pole.position.set(x,3.5,z);scene.add(pole);const arm=new THREE.Mesh(new THREE.BoxGeometry(1.5,.12,.12),material(0x4a5355));arm.position.set(x+(rot?-.65:.65),6.75,z);scene.add(arm);const lamp=new THREE.Mesh(new THREE.BoxGeometry(.55,.18,.32),material(0xffe6a6));lamp.position.set(x+(rot? -1.3:1.3),6.65,z);scene.add(lamp)}
+// Add varied rooflines and subtle window grids to give the blocks an urban Accra character.
+const facadeMats=[0xd8c9ae,0xc5d0cd,0xe0d4c0,0xb5c1bd].map(c=>material(c));
+for(const child of scene.children){if(child.userData.building){/* reserved for future building metadata */}}
+for(let x=-285;x<=285;x+=68){for(let z=-330;z<=185;z+=68){if(Math.random()<.36)continue;let near=false;for(const r of edgeData){const p=r.curve.getPointAt(.5);if(Math.hypot(x-p.x,z-p.z)<26){near=true;break}}if(near)continue;addTree(x+(Math.random()*8-4),z+(Math.random()*8-4),.75+Math.random()*.45)}}
+for(const r of edgeData){if(r.curve.length<55)continue;for(let d=32;d<r.curve.length-20;d+=68){const t=d/r.curve.length,p=r.curve.getPointAt(t),tan=r.curve.getTangentAt(t).normalize(),side=new THREE.Vector3(-tan.z,0,tan.x);const sign=Math.random()<.5?-1:1;const x=p.x+side.x*12.2*sign,z=p.z+side.z*12.2*sign;if(Math.random()<.48)addStreetlight(x,z,sign<0?1:0);else addTree(x,z,.72+Math.random()*.25)}}
+// Raised, pale junction corner islands make intersections easier to read.
+for(const [id,p] of Object.entries(nodes)){const island=new THREE.Mesh(new THREE.BoxGeometry(17,.13,17),sidewalkMat);island.position.set(p[0],-.015,p[2]);scene.add(island);const apron=new THREE.Mesh(new THREE.BoxGeometry(14.2,.09,14.2),asphalt);apron.position.set(p[0],.055,p[2]);scene.add(apron)}
+// A few low roadside walls and drainage channels add scale without cluttering the carriageway.
+for(let x=-300;x<=300;x+=60){for(const z of [-410,245]){const wall=new THREE.Mesh(new THREE.BoxGeometry(42,.45,.55),material(0x8d9188));wall.position.set(x,.22,z);scene.add(wall)}}
 // Player vehicle, facing down the main avenue
 const car=new THREE.Group();const body=new THREE.Mesh(new THREE.BoxGeometry(2.35,.9,4.5),material(0x087ca8,.4));body.position.y=.85;body.castShadow=true;car.add(body);const cabin=new THREE.Mesh(new THREE.BoxGeometry(1.82,.82,2.15),material(0x172b37,.25));cabin.position.set(0,1.65,-.25);car.add(cabin);const bumper=new THREE.Mesh(new THREE.BoxGeometry(2.1,.22,.2),material(0xe7e4d5));bumper.position.set(0,.65,-2.28);car.add(bumper);
 for(const x of [-.78,.78]){const lamp=new THREE.Mesh(new THREE.BoxGeometry(.35,.18,.08),material(0xfff2c7));lamp.position.set(x,1.02,-2.28);car.add(lamp)}car.position.set(0,0,112);scene.add(car);

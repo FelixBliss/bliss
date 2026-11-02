@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>AccraRide — Branching Road Network</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101820;font-family:Arial,sans-serif;color:#fff}canvas{display:block}#hud{position:fixed;top:12px;left:12px;z-index:2;background:#07131ddd;border:1px solid #ffffff30;border-radius:12px;padding:10px 13px;font-size:13px;line-height:1.55}#hud b{color:#8ee7ff}#help{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);background:#07131ddd;border:1px solid #ffffff30;border-radius:12px;padding:9px 13px;font-size:12px;text-align:center;white-space:nowrap}#touch{position:fixed;bottom:68px;left:0;right:0;display:flex;justify-content:space-between;padding:0 18px;pointer-events:none}.pad{display:flex;gap:10px;pointer-events:auto}.pad button{width:58px;height:58px;border:1px solid #ffffff55;border-radius:16px;background:#07131dcc;color:white;font-size:22px;touch-action:none}.pad button:active{background:#167ca0}#note{position:fixed;top:12px;right:12px;background:#07131ddd;padding:9px 12px;border-radius:10px;font-size:12px}
+</style></head><body>
+<div id="hud"><b>ACCRARIDE · ROAD NETWORK TEST</b><br>Speed: <span id="speed">0</span> km/h<br>Road: <span id="road">Central Avenue</span><br>Network: 7 connected links · 4 junctions</div><div id="note">Independent prototype · Production untouched</div>
+<div id="touch"><div class="pad"><button id="left">◀</button><button id="right">▶</button></div><div class="pad"><button id="brake">▼</button><button id="gas">▲</button></div></div>
+<div id="help">WASD / Arrow keys or touch controls · Drive through connected junctions and take side roads</div>
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x9cc5d8);scene.fog=new THREE.Fog(0x9cc5d8,180,620);
+const camera=new THREE.PerspectiveCamera(62,innerWidth/innerHeight,.1,1000);
+const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;document.body.appendChild(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xeaf7ff,0x52634c,2));const sun=new THREE.DirectionalLight(0xffffff,2.2);sun.position.set(-80,140,70);sun.castShadow=true;scene.add(sun);
+const mat=(c,r=.9)=>new THREE.MeshStandardMaterial({color:c,roughness:r});
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(1200,1200),mat(0x718b65));ground.rotation.x=-Math.PI/2;ground.position.y=-.18;scene.add(ground);
+const asphalt=mat(0x30363b),line=mat(0xe9e2c9),edge=mat(0xd7d7c9),buildingMats=[0xc6b39a,0xb9c5c9,0xd0a77f,0x9eafb1];
+const nodes={A:[0,0,100],B:[0,0,20],C:[0,0,-70],D:[0,0,-160],E:[-100,0,20],F:[100,0,20],G:[-100,0,-160],H:[100,0,-160],I:[0,0,-260],J:[-185,0,-70],K:[185,0,-70]};
+const links=[['A','B','Central Avenue'],['B','C','Central Avenue'],['C','D','Ring Connector'],['D','I','Central Avenue'],['E','B','West Branch'],['B','F','East Branch'],['G','D','Northwest Link'],['D','H','Northeast Link'],['C','J','West Connector'],['C','K','East Connector']];
+const curves=[];
+function road(a,b,name){const p=nodes[a],q=nodes[b],curve=new THREE.LineCurve3(new THREE.Vector3(...p),new THREE.Vector3(...q));curves.push({a,b,name,curve});const pts=curve.getPoints(24),verts=[],uv=[],idx=[];for(let i=0;i<pts.length;i++){const t=pts[Math.max(0,Math.min(pts.length-1,i+1))].clone().sub(pts[Math.max(0,i-1)]).normalize();const side=new THREE.Vector3(-t.z,0,t.x).normalize();for(const s of [-6,6]){const v=pts[i].clone().addScaledVector(side,s);v.y=.02;verts.push(v.x,v.y,v.z);uv.push(0,i/pts.length)}}for(let i=0;i<pts.length-1;i++){let n=i*2;idx.push(n,n+1,n+2,n+1,n+3,n+2)}const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));g.setIndex(idx);g.computeVertexNormals();scene.add(new THREE.Mesh(g,asphalt));
+// edge lines
+for(const s of [-5.55,5.55]){const ps=pts.map((p,i)=>{const t=pts[Math.min(pts.length-1,i+1)].clone().sub(pts[Math.max(0,i-1)]).normalize();return p.clone().add(new THREE.Vector3(-t.z,0,t.x).normalize().multiplyScalar(s)).setY(.09)});const geo=new THREE.BufferGeometry().setFromPoints(ps);scene.add(new THREE.Line(geo,new THREE.LineBasicMaterial({color:0xd5d4c9})))}
+// broken centre line
+for(let i=1;i<pts.length-1;i+=3){const t=pts[i+1].clone().sub(pts[i-1]).normalize(),p=pts[i].clone();p.y=.1;const dash=new THREE.Mesh(new THREE.BoxGeometry(.18,.025,3.3),line);dash.position.copy(p);dash.rotation.y=Math.atan2(t.x,t.z);scene.add(dash)}
+}
+links.forEach(l=>road(...l));
+for(const [id,p] of Object.entries(nodes)){const j=new THREE.Mesh(new THREE.BoxGeometry(13,.08,13),asphalt);j.position.set(p[0],.045,p[2]);scene.add(j);}
+// simple urban blocks around roads
+for(let x=-240;x<=240;x+=35)for(let z=-300;z<=160;z+=38){if(Math.abs(x)<18||Math.abs(x-100)<15||Math.abs(x+100)<15||Math.abs(z-20)<13||Math.abs(z+70)<13||Math.abs(z+160)<13)continue;const h=8+Math.random()*24,w=10+Math.random()*9;const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,12+Math.random()*8),mat(buildingMats[Math.floor(Math.random()*buildingMats.length)]));b.position.set(x,h/2,z);scene.add(b)}
+// player vehicle
+const car=new THREE.Group();const body=new THREE.Mesh(new THREE.BoxGeometry(2.4,1,4.4),mat(0x087ca8,.45));body.position.y=.9;car.add(body);const cabin=new THREE.Mesh(new THREE.BoxGeometry(1.85,.85,2.1),mat(0x182c38,.3));cabin.position.set(0,1.75,-.25);car.add(cabin);const nose=new THREE.Mesh(new THREE.BoxGeometry(2.1,.25,.25),mat(0xece9d9));nose.position.set(0,.8,-2.18);car.add(nose);car.position.set(0,0,70);scene.add(car);
+let speed=0,heading=0,steer=0;const keys={};addEventListener('keydown',e=>keys[e.key.toLowerCase()]=true);addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+function bind(id,k){const el=document.getElementById(id);el.addEventListener('pointerdown',e=>{e.preventDefault();keys[k]=true});['pointerup','pointercancel','pointerleave'].forEach(ev=>el.addEventListener(ev,()=>keys[k]=false))}
+bind('left','arrowleft');bind('right','arrowright');bind('gas','arrowup');bind('brake','arrowdown');
+function nearestRoad(){let best=null,bd=1e9;for(const r of curves){const pts=r.curve.getPoints(30);for(let i=0;i<pts.length;i++){const d=Math.hypot(car.position.x-pts[i].x,car.position.z-pts[i].z);if(d<bd){bd=d;best=r.name}}}return best||'Open road'}
+const clock=new THREE.Clock();function tick(){requestAnimationFrame(tick);const dt=Math.min(clock.getDelta(),.04);const forward=keys.w||keys.arrowup,back=keys.s||keys.arrowdown,left=keys.a||keys.arrowleft,right=keys.d||keys.arrowright;speed+=forward?34*dt:0;speed-=back?58*dt:0;speed-=speed>0?5*dt:-5*dt;speed=THREE.MathUtils.clamp(speed,-12,65);steer=THREE.MathUtils.damp(steer,(left?1:0)-(right?1:0),7,dt);heading+=steer*dt*(.35+Math.abs(speed)/35);car.rotation.y=heading;car.position.x-=Math.sin(heading)*speed*dt*.42;car.position.z-=Math.cos(heading)*speed*dt*.42;const target=new THREE.Vector3(car.position.x+Math.sin(heading)*13,8,car.position.z+Math.cos(heading)*13);camera.position.lerp(target,1-Math.exp(-3*dt));const look=new THREE.Vector3(car.position.x-Math.sin(heading)*9,2,car.position.z-Math.cos(heading)*9);camera.lookAt(look);document.getElementById('speed').textContent=Math.round(Math.abs(speed)*2.1);document.getElementById('road').textContent=nearestRoad();renderer.render(scene,camera)}
+tick();addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+</script></body></html>

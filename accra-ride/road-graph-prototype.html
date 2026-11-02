@@ -317,7 +317,9 @@ function update(dt){
  const cameraFrustum=new THREE.Frustum().setFromProjectionMatrix(viewProjection);
  for(const v of traffic){
   const behindMetres=(progress-v.t)*roadLength;
-  if(behindMetres>85&&!cameraFrustum.containsPoint(v.mesh.position)){
+  const recycleDistance=v.playerCollisionHold?150:85;
+   if(behindMetres>recycleDistance&&!cameraFrustum.containsPoint(v.mesh.position)){
+    v.playerCollisionHold=false;
    v.t=THREE.MathUtils.clamp(progress+.62,.04,.96);
    v.lane=v.homeLane;v.targetLane=v.homeLane;v.speed=v.cruiseSpeed;
    v.aiRecoveryHold=0;v.hitCooldown=0;v.avoidanceHold=0;

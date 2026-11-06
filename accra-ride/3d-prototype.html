@@ -67,7 +67,7 @@ const steeringWheel=new THREE.Group();const steeringMaterial=mat(0x17191b,.35,.1
 const headlamps=[];for(const x of [-.43,.43]){const lamp=new THREE.SpotLight(0xfff1ce,0,68,Math.PI/7,.45,1.3);lamp.position.set(x,.57,-1.43);lamp.target.position.set(x,-.05,-28);player.add(lamp);player.add(lamp.target);headlamps.push(lamp);const lens=new THREE.Mesh(new THREE.BoxGeometry(.3,.15,.055),mat(0xfff4c8,.25));lens.position.set(x,.61,-1.43);player.add(lens);const glow=new THREE.PointLight(0xffe7a1,0,4);glow.position.set(x,.6,-1.5);player.add(glow);headlamps.push(glow)}
 
 const bulbs=[];const traffic=[];const colors=[0xd94b40,0x287cb6,0xe4e4dc,0x3b4a54,0xe3a34b,0x4b9a66];
-function addTraffic(edge,dir,progress,lane,bike=false){const o=car(bike?0x262d31:colors[Math.floor(Math.random()*colors.length)],bike);const pose=edgePose(edge,dir,progress,lane);o.position.copy(pose.position);o.rotation.y=Math.atan2(-pose.tangent.x,-pose.tangent.z);o.userData={edge,dir,progress,lane,bike,speed:bike?82+Math.random()*38:58+Math.random()*65,changeCooldown:Math.random()*2,collisionCooldown:0};world.add(o);traffic.push(o)}
+function addTraffic(edge,dir,progress,lane,bike=false){const o=car(bike?0x262d31:colors[Math.floor(Math.random()*colors.length)],bike);const pose=edgePose(edge,dir,progress,lane);o.position.copy(pose.position);o.rotation.y=Math.atan2(-pose.tangent.x,-pose.tangent.z);o.userData={edge,dir,progress,lane,homeLane:lane,targetLane:lane,overtaking:false,passTarget:null,bike,speed:bike?82+Math.random()*38:58+Math.random()*65,changeCooldown:Math.random()*1.2,collisionCooldown:0};world.add(o);traffic.push(o)}
 for(let i=0;i<38;i++){const edge=edgeData[Math.floor(Math.random()*edgeData.length)],dir=Math.random()<.5?1:-1,progress=12+Math.random()*(edge.length-24),lane=(Math.random()<.5?2.75:6.25);addTraffic(edge,dir,progress,lane,i%6===2)}
 let lightPhase=0,lightTime=0,redWarning=false;
 let speed=0,steer=0,steerTarget=0,lateralVelocity=0,gas=false,brake=false,reverse=false,active=false,coins=20,hitLock=0,collisionRecovery=0,driveDistance=0,last=performance.now(),wheelTouch=null,gasLevel=0,brakeLevel=0,throttleResponse=0,cameraMode=0,lightsOn=false,audioCtx=null,engineOsc=null,engineGain=null,hornOsc=null,hornGain=null;
@@ -108,6 +108,20 @@ function update(dt){
  if(engineOsc&&audioCtx){engineOsc.frequency.setTargetAtTime(48+Math.abs(speed)*1.25+(throttle?20:0),audioCtx.currentTime,.08);engineGain.gain.setTargetAtTime(active?.018+(throttle?.012:0)+(brake?.004:0):.0001,audioCtx.currentTime,.12)}
  traffic.forEach(o=>{
   const u=o.userData;u.changeCooldown=Math.max(0,u.changeCooldown-dt);u.collisionCooldown=Math.max(0,u.collisionCooldown-dt);
+  const sameFlow=traffic.filter(t=>t!==o&&t.userData.edge===u.edge&&t.userData.dir===u.dir);
+  const ahead=sameFlow.filter(t=>u.dir===1?t.userData.progress>u.progress:t.userData.progress<u.progress).sort((a,b)=>Math.abs(a.userData.progress-u.progress)-Math.abs(b.userData.progress-u.progress))[0];
+  const gap=ahead?Math.abs(ahead.userData.progress-u.progress):Infinity;
+  if(ahead&&gap<25&&ahead.userData.speed<u.speed-5&&!u.overtaking&&u.changeCooldown<=0){
+    const otherLane=u.homeLane===2.75?6.25:2.75;
+    const clear=!sameFlow.some(t=>Math.abs(t.userData.lane-otherLane)<1.1&&Math.abs(t.userData.progress-u.progress)<22);
+    if(clear){u.targetLane=otherLane;u.overtaking=true;u.passTarget=ahead;u.changeCooldown=2.2;}
+  }
+  u.lane+=(u.targetLane-u.lane)*Math.min(1,dt*2.8);
+  if(u.overtaking&&Math.abs(u.lane-u.targetLane)<.2){
+    const target=u.passTarget,passed=!target||!traffic.includes(target)||(u.dir===1?u.progress>target.userData.progress+7:u.progress<target.userData.progress-7);
+    const homeClear=!sameFlow.some(t=>Math.abs(t.userData.lane-u.homeLane)<1.1&&Math.abs(t.userData.progress-u.progress)<15);
+    if(passed&&homeClear){u.targetLane=u.homeLane;u.overtaking=false;u.passTarget=null;u.changeCooldown=2.8;}
+  }
   const trafficPace=paceOf(u.speed);advanceVehicle(u,trafficPace*dt,0);
   const tp=edgePose(u.edge,u.dir,u.progress,u.lane);o.position.copy(tp.position);o.rotation.y=Math.atan2(-tp.tangent.x,-tp.tangent.z);
   // Vehicle collision checks use actual graph-space positions, not a screen-space or nearest-road approximation.

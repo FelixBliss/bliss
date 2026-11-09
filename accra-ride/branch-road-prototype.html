@@ -208,21 +208,23 @@ function advancePlayer(dt){
  heading-=steer*(.22+Math.min(kmh,90)*.018)*dt*forwardSign;
  car.rotation.y=heading;
  for(const wheel of car.userData.steeringWheels||[])wheel.rotation.y=steer*.42;
+ const previousX=car.position.x,previousZ=car.position.z;
  const travel=(speed/3.6)*dt*forwardSign;
  car.position.x+=-Math.sin(heading)*travel;
  car.position.z+=-Math.cos(heading)*travel;
  const projection=projectToRoad(car.position.x,car.position.z);
  if(projection){
   const nearJunction=nearestJunctionDistance(car.position.x,car.position.z)<19;
+  // Reject outward movement at the road edge; do not drag the car sideways.
   if(!nearJunction&&projection.distance>7.65){
-   const excess=projection.distance-7.65,side=new THREE.Vector3(-projection.tangent.z,0,projection.tangent.x),sign=Math.sign(projection.lateral)||1;
-   const correction=Math.min(excess,excess*Math.min(1,dt*7));
-   car.position.x-=side.x*sign*correction;car.position.z-=side.z*sign*correction;
-   if(projection.distance>12)speed=Math.min(speed,18);
+   car.position.x=previousX;
+   car.position.z=previousZ;
+   speed*=.65;
   }
-  playerEdge=projection.edge;playerT=projection.t;
-  playerDirection=projection.tangent.x*(-Math.sin(heading))+projection.tangent.z*(-Math.cos(heading))>=0?1:-1;
-  playerLaneOffset=projection.distance;
+  const acceptedProjection=projectToRoad(car.position.x,car.position.z)||projection;
+  playerEdge=acceptedProjection.edge;playerT=acceptedProjection.t;
+  playerDirection=acceptedProjection.tangent.x*(-Math.sin(heading))+acceptedProjection.tangent.z*(-Math.cos(heading))>=0?1:-1;
+  playerLaneOffset=acceptedProjection.distance;
  }
 }
 placePlayerOnEdge();

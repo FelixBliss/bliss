@@ -86,7 +86,7 @@ const samples=curve.getPoints(Math.max(24,Math.ceil(curve.getLength()/5))),verts
  const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));geo.setIndex(indices);geo.computeVertexNormals();const roadMesh=new THREE.Mesh(geo,asphalt);roadMesh.receiveShadow=true;scene.add(roadMesh);
  // Continuous raised flower median along the curved centreline.
  const medianVerts=[],medianIndices=[],flowerColors=[0xe85b78,0xf2bd42,0xffffff,0xb68bea];
- for(let i=0;i<samples.length;i++){const tangent=curve.getTangent(i/(samples.length-1)).normalize(),side=new THREE.Vector3(-tangent.z,0,tangent.x).normalize();for(const offset of [-.9,.9]){const p=samples[i].clone().addScaledVector(side,offset);p.y=.17;medianVerts.push(p.x,p.y,p.z)}}
+ for(let i=0;i<samples.length;i++){const t=i/(samples.length-1),endClearance=Math.min(t*curve.getLength(),(1-t)*curve.getLength());if(endClearance<19)continue;const tangent=curve.getTangent(t).normalize(),side=new THREE.Vector3(-tangent.z,0,tangent.x).normalize();for(const offset of [-.9,.9]){const p=samples[i].clone().addScaledVector(side,offset);p.y=.17;medianVerts.push(p.x,p.y,p.z)}}
  for(let i=0;i<samples.length-1;i++){const n=i*2;medianIndices.push(n,n+1,n+2,n+1,n+3,n+2)}
  const medianGeo=new THREE.BufferGeometry();medianGeo.setAttribute('position',new THREE.Float32BufferAttribute(medianVerts,3));medianGeo.setIndex(medianIndices);medianGeo.computeVertexNormals();scene.add(new THREE.Mesh(medianGeo,medianGreen));
  for(let d=10,idx=0;d<curve.getLength()-5;d+=22,idx++){const t=d/curve.getLength(),p=curve.getPointAt(t),tan=curve.getTangentAt(t).normalize(),bed=new THREE.Group();bed.position.copy(p);bed.rotation.y=Math.atan2(tan.x,tan.z);const planter=new THREE.Mesh(new THREE.BoxGeometry(1.35,.14,2.2),material(0x68745a));planter.position.y=.25;bed.add(planter);for(let j=0;j<3;j++){const stem=new THREE.Mesh(new THREE.CylinderGeometry(.025,.035,.22,5),material(0x3c7c43));stem.position.set(-.38+j*.38,.42,0);bed.add(stem);const bloom=new THREE.Mesh(new THREE.SphereGeometry(.105,8,6),material(flowerColors[(idx+j)%flowerColors.length]));bloom.position.set(-.38+j*.38,.56,0);bed.add(bloom)}scene.add(bed)}
@@ -96,8 +96,14 @@ const samples=curve.getPoints(Math.max(24,Math.ceil(curve.getLength()/5))),verts
  for(let d=8;d<curve.getLength()-5;d+=13){const t=d/curve.getLength(),p=curve.getPointAt(t),tan=curve.getTangentAt(t);for(const offset of [-4.5,4.5]){const dash=new THREE.Mesh(new THREE.BoxGeometry(.14,.025,4.5),lanePaint);dash.position.copy(p).add(new THREE.Vector3(-tan.z,0,tan.x).normalize().multiplyScalar(offset));dash.position.y=.105;dash.rotation.y=Math.atan2(tan.x,tan.z);scene.add(dash)}}
 }
 roads.forEach(makeRoad);
-// Junction aprons and raised curb corners
-for(const [id,p] of Object.entries(nodes)){const pad=new THREE.Mesh(new THREE.BoxGeometry(14,.07,14),asphalt);pad.position.set(p[0],.035,p[2]);scene.add(pad);}
+// Continuous asphalt junction aprons with rounded kerb rings. The circular apron
+// joins incoming road surfaces without square patches or raised islands blocking lanes.
+for(const [id,p] of Object.entries(nodes)){
+ const apron=new THREE.Mesh(new THREE.CircleGeometry(17,32),asphalt);
+ apron.rotation.x=-Math.PI/2;apron.position.set(p[0],.045,p[2]);apron.receiveShadow=true;scene.add(apron);
+ const ring=new THREE.Mesh(new THREE.RingGeometry(17,18.2,32),curb);
+ ring.rotation.x=-Math.PI/2;ring.position.set(p[0],.052,p[2]);scene.add(ring);
+}
 // Urban blocks placed away from the road corridors
 const buildingColors=[0xc7b49d,0xb8c5c7,0xd0a77e,0x9eafb1,0xb8aa92];
 for(let x=-290;x<=290;x+=34)for(let z=-360;z<=210;z+=34){let clear=false;for(const r of edgeData){const samples=r.curve.getPoints(12);for(let i=0;i<samples.length-1;i++){const a=samples[i],b=samples[i+1],dx=b.x-a.x,dz=b.z-a.z,t=THREE.MathUtils.clamp(((x-a.x)*dx+(z-a.z)*dz)/(dx*dx+dz*dz||1),0,1);if(Math.hypot(x-(a.x+t*dx),z-(a.z+t*dz))<17){clear=true;break}}if(clear)break}if(clear||Math.random()<.16)continue;const h=9+Math.random()*25,w=10+Math.random()*10;const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,12+Math.random()*8),material(buildingColors[Math.floor(Math.random()*buildingColors.length)]));b.position.set(x,h/2,z);b.castShadow=true;scene.add(b)}
@@ -110,8 +116,7 @@ const facadeMats=[0xd8c9ae,0xc5d0cd,0xe0d4c0,0xb5c1bd].map(c=>material(c));
 for(const child of scene.children){if(child.userData.building){/* reserved for future building metadata */}}
 for(let x=-285;x<=285;x+=68){for(let z=-330;z<=185;z+=68){if(Math.random()<.36)continue;let near=false;for(const r of edgeData){const p=r.curve.getPointAt(.5);if(Math.hypot(x-p.x,z-p.z)<26){near=true;break}}if(near)continue;addTree(x+(Math.random()*8-4),z+(Math.random()*8-4),.75+Math.random()*.45)}}
 for(const r of edgeData){if(r.curve.length<55)continue;for(let d=32;d<r.curve.length-20;d+=68){const t=d/r.curve.length,p=r.curve.getPointAt(t),tan=r.curve.getTangentAt(t).normalize(),side=new THREE.Vector3(-tan.z,0,tan.x);const sign=Math.random()<.5?-1:1;const x=p.x+side.x*12.2*sign,z=p.z+side.z*12.2*sign;if(Math.random()<.48)addStreetlight(x,z,sign<0?1:0);else addTree(x,z,.72+Math.random()*.25)}}
-// Raised, pale junction corner islands make intersections easier to read.
-for(const [id,p] of Object.entries(nodes)){const island=new THREE.Mesh(new THREE.BoxGeometry(17,.13,17),sidewalkMat);island.position.set(p[0],-.015,p[2]);scene.add(island);const apron=new THREE.Mesh(new THREE.BoxGeometry(14.2,.09,14.2),asphalt);apron.position.set(p[0],.055,p[2]);scene.add(apron)}
+// Junction aprons above provide a clear continuous surface; no raised square island blocks turning paths.
 // A few low roadside walls and drainage channels add scale without cluttering the carriageway.
 for(let x=-300;x<=300;x+=60){for(const z of [-410,245]){const wall=new THREE.Mesh(new THREE.BoxGeometry(42,.45,.55),material(0x8d9188));wall.position.set(x,.22,z);scene.add(wall)}}
 // Player vehicle, facing down the main avenue
@@ -163,8 +168,8 @@ function placePlayerOnEdge(){
  const side=new THREE.Vector3(-tangent.z,0,tangent.x).normalize();
  const point=playerEdge.curve.getPointAt(playerT);
  car.position.set(point.x+side.x*playerLaneOffset,0,point.z+side.z*playerLaneOffset);
- heading=Math.atan2(-tangent.x,-tangent.z);
- car.rotation.y=heading;for(const wheel of car.userData.steeringWheels||[])wheel.rotation.y=steer*.38;
+ heading=Math.atan2(-tangent.x,-tangent.z)+steer*.22;
+ car.rotation.y=heading;for(const wheel of car.userData.steeringWheels||[])wheel.rotation.y=steer*.42;
 }
 function branchAngle(incoming,incomingDirection,outgoing,nodeId){
  const inT=incoming.curve.getTangentAt(incomingDirection>0?1:0).normalize().multiplyScalar(incomingDirection);
@@ -230,7 +235,7 @@ const camBack=cameraMode===1?9:cameraMode===2?20:14,camHeight=cameraMode===1?5.5
 let junction='No junction nearby',junctionDist=Infinity;for(const [id,p] of Object.entries(nodes)){const d=Math.hypot(car.position.x-p[0],car.position.z-p[2]);if(d<junctionDist){junctionDist=d;junction=id}}if(junctionDist>38)junction='No junction nearby';else junction='Junction '+junction+' · '+Math.round(junctionDist)+' m';
 document.getElementById('speed').textContent=Math.round(Math.abs(speed));document.getElementById('road').textContent=info.distance<20?info.road.name:'Off road';document.getElementById('junction').textContent=junction;document.getElementById('traffic').textContent=traffic.length;document.getElementById('drivingState').textContent=collisionFlash>0?'Collision':offRoad?'Off road':'On road';document.getElementById('status').textContent=collisionFlash>0?'Collision · speed reduced':offRoad?'Off road · reduced traction':'Master vehicle models · curved Central Accra roads · Preview only';drawMap();renderer.render(scene,camera)}
 // Master-style touch steering, pedals, D/R, camera, lights, horn and reset.
-const wheelArea=document.getElementById('wheelArea');let wheelTouch=null,wheelStartX=0,wheelStartSteer=0;wheelArea.addEventListener('pointerdown',e=>{e.preventDefault();wheelArea.setPointerCapture(e.pointerId);wheelTouch=e.pointerId;wheelStartX=e.clientX;wheelStartSteer=steerTarget});wheelArea.addEventListener('pointermove',e=>{if(wheelTouch!==e.pointerId)return;steerTarget=THREE.MathUtils.clamp(wheelStartSteer+(e.clientX-wheelStartX)/42,-1,1);if(Math.abs(steerTarget)>.3)branchIntent=Math.sign(steerTarget);wheelArea.style.setProperty('--wheel-turn',(steerTarget*125)+'deg')});function releaseWheel(e){if(wheelTouch!==e.pointerId)return;wheelTouch=null;steerTarget=0;wheelArea.style.setProperty('--wheel-turn','0deg')}wheelArea.addEventListener('pointerup',releaseWheel);wheelArea.addEventListener('pointercancel',releaseWheel);
+const wheelArea=document.getElementById('wheelArea');let wheelTouch=null,wheelCenter=null,wheelStartAngle=0,wheelStartSteer=0;function wheelAngle(e){const r=wheelArea.getBoundingClientRect();return Math.atan2(e.clientY-(r.top+r.height/2),e.clientX-(r.left+r.width/2))}wheelArea.addEventListener('pointerdown',e=>{e.preventDefault();wheelArea.setPointerCapture(e.pointerId);wheelTouch=e.pointerId;wheelStartAngle=wheelAngle(e);wheelStartSteer=steerTarget});wheelArea.addEventListener('pointermove',e=>{if(wheelTouch!==e.pointerId)return;let delta=wheelAngle(e)-wheelStartAngle;if(delta>Math.PI)delta-=Math.PI*2;if(delta< -Math.PI)delta+=Math.PI*2;steerTarget=THREE.MathUtils.clamp(wheelStartSteer+delta*1.25,-1,1);if(Math.abs(steerTarget)>.22)branchIntent=Math.sign(steerTarget);wheelArea.style.setProperty('--wheel-turn',(steerTarget*150)+'deg')});function releaseWheel(e){if(wheelTouch!==e.pointerId)return;wheelTouch=null;steerTarget=0;wheelArea.style.setProperty('--wheel-turn','0deg')}wheelArea.addEventListener('pointerup',releaseWheel);wheelArea.addEventListener('pointercancel',releaseWheel);
 function holdButton(id,setter){const el=document.getElementById(id);const on=e=>{e.preventDefault();setter(true);el.setPointerCapture?.(e.pointerId)};const off=()=>setter(false);el.addEventListener('pointerdown',on);['pointerup','pointercancel','pointerleave'].forEach(n=>el.addEventListener(n,off))}
 holdButton('gasMaster',v=>gasHeld=v);holdButton('brakeMaster',v=>brakeHeld=v);
 document.getElementById('gearBtn').onclick=()=>{if(speed>3){document.getElementById('status').textContent='Brake to near stop before changing gear';return}driveReverse=!driveReverse;document.getElementById('gearBtn').textContent=driveReverse?'GEAR: R':'GEAR: D'};
